@@ -348,3 +348,18 @@ footer.site a:hover { color: var(--ink); }
 .new-pot .form-section:first-of-type { margin-top: 20px; }
 .submit-bar { position: sticky; bottom: 16px; z-index: 5; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 14px 16px 14px 14px; margin-top: 12px; border: 1px solid var(--line); border-radius: 999px; background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(12px); box-shadow: var(--shadow); }
 @media (max-width: 640px) { .submit-bar { border-radius: 20px; } }
+
+/* ---------- pot page ---------- */
+.pot-page { padding-top: 32px; }
+.pot-hero { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 0; padding: 0; overflow: hidden; }
+.pot-main { padding: 30px; }
+.pot-main h1 { font-size: clamp(2rem, 4vw, 3rem); margin: 18px 0 22px; }
+.pot-main .big { margin-bottom: 18px; }
+.pot-rules { padding: 30px; border-left: 1px solid var(--line); background: var(--surface-2); display: flex; flex-direction: column; gap: 0; }
+.pot-rules .label { margin-bottom: 10px; }
+.rule { padding: 14px 0; border-top: 1px solid var(--line); display: grid; gap: 4px; }
+.rule > span { font-size: 0.85rem; color: var(--muted); }
+.rule > b { font-weight: 500; font-size: 1.1rem; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.rule .bar { margin: 6px 0 2px; }
+.pot-page .card h2 { font-size: 1.35rem; }
+@media (max-width: 860px) { .pot-hero { grid-template-columns: 1fr; } .pot-rules { border-left: 0; border-top: 1px solid var(--line); } }

@@ -64,33 +64,37 @@ export function PotPage({ id }: { id: bigint }) {
   };
 
   return (
-    <div className="stack" style={{ gap: 18 }}>
-      <div className="card stack">
-        <div className="row between">
-          <span className="muted small">
-            Pot #{pot.id.toString()} · {isFunder ? "you fund it" : isSpender ? "you spend it" : mine ? "it can pay you" : "you're viewing it"}
-          </span>
-          <span className={`pill ${s.tone}`}>{s.label}</span>
+    <div className="stack pot-page" style={{ gap: 18 }}>
+      <section className="card pot-hero reveal">
+        <div className="pot-main">
+          <div className="row" style={{ gap: 12 }}>
+            <span className="label">
+              Pot #{pot.id.toString()} · {isFunder ? "you fund it" : isSpender ? "you spend it" : mine ? "it can pay you" : "you're viewing it"}
+            </span>
+            <span className={`pill ${s.tone}`}>{s.label}</span>
+          </div>
+          <h1>{pot.purpose}</h1>
+          <div className="big">
+            {units(pot.balance, pot.decimals)}
+            <span className="unit">{pot.symbol} left</span>
+          </div>
+          <div className="bar" role="img" aria-label={`${money(pot.paidOut, pot)} paid out of ${money(pot.balance + pot.paidOut, pot)} put in`}>
+            <div style={{ width: `${pot.balance + pot.paidOut > 0n ? Number((pot.paidOut * 100n) / (pot.balance + pot.paidOut)) : 0}%` }} />
+          </div>
+          <div className="ev-meta" style={{ marginTop: 12 }}>
+            <span>Paid out {money(pot.paidOut, pot)}</span>
+            <span>Ends {when(pot.endsAt)}</span>
+            <span>
+              Funder <Addr value={pot.funder} qor />
+            </span>
+            <span>
+              Spender <Addr value={pot.recipient} qor />
+            </span>
+          </div>
+          {pot.frozen && !pot.closed && <p className="pill bad" style={{ marginTop: 14 }}>The funder has frozen this pot. No payments until they unfreeze it.</p>}
         </div>
-        <h1 style={{ fontSize: "2rem" }}>{pot.purpose}</h1>
-        <div className="big">{money(pot.balance, pot)}</div>
-        <div className="row small muted">
-          <span>Paid out so far: {money(pot.paidOut, pot)}</span>
-          <span>Ends {when(pot.endsAt)}</span>
-          <span>
-            Funder <Addr value={pot.funder} qor />
-          </span>
-          <span>
-            Spender <Addr value={pot.recipient} qor />
-          </span>
-        </div>
-        {pot.frozen && !pot.closed && <p className="pill bad">The funder has frozen this pot. No payments until they unfreeze it.</p>}
-      </div>
-
-      <div className="grid cols-2">
         <Limits pot={pot} period={period} />
-        <PayIn pot={pot} demoFunder={!!demo && isFunder} onDone={after} />
-      </div>
+      </section>
 
       {signer && open && isSpender && <SpenderActions pot={pot} payees={payees} onDone={after} />}
       {signer && !pot.closed && isFunder && <FunderActions pot={pot} payees={payees} onDone={after} />}
@@ -116,7 +120,10 @@ export function PotPage({ id }: { id: bigint }) {
         </div>
       )}
 
-      <PayeeList pot={pot} payees={payees} />
+      <div className="grid cols-2">
+        <PayeeList pot={pot} payees={payees} />
+        <PayIn pot={pot} demoFunder={!!demo && isFunder} onDone={after} />
+      </div>
       <Activity pot={pot} entries={entries} nameOf={nameOf} />
     </div>
   );
@@ -125,31 +132,35 @@ export function PotPage({ id }: { id: bigint }) {
 function Limits({ pot, period }: { pot: Pot; period?: { spent: bigint; limit: bigint; resetsAt: bigint } }) {
   const pct = period && period.limit > 0n ? Number((period.spent * 100n) / period.limit) : 0;
   return (
-    <div className="card stack">
-      <h2>Limits</h2>
-      <p style={{ margin: 0 }}>
-        Most per payment: <strong>{pot.maxPerPayment > 0n ? money(pot.maxPerPayment, pot) : "no cap"}</strong>
-      </p>
+    <div className="pot-rules">
+      <span className="label">Rules the contract enforces</span>
+      <div className="rule">
+        <span>Most per payment</span>
+        <b>{pot.maxPerPayment > 0n ? money(pot.maxPerPayment, pot) : "No cap"}</b>
+      </div>
       {pot.periodDays > 0 && period ? (
-        <>
-          <p style={{ margin: 0 }}>
-            This period: <strong>{money(period.spent, pot)}</strong> of {money(period.limit, pot)} (every {pot.periodDays} {pot.periodDays === 1 ? "day" : "days"})
-          </p>
-          <div className={`bar ${pct >= 100 ? "full" : ""}`} role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+        <div className="rule">
+          <span>
+            This period · every {pot.periodDays} {pot.periodDays === 1 ? "day" : "days"}
+          </span>
+          <b>
+            {money(period.spent, pot)} <span className="muted">of {units(period.limit, pot.decimals)}</span>
+          </b>
+          <div className={`bar ${pct >= 100 ? "full" : ""}`} role="progressbar" aria-label="Spent this period" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
             <div style={{ width: `${Math.min(100, pct)}%` }} />
           </div>
-          <p className="muted small" style={{ margin: 0 }}>
-            Starts again {when(period.resetsAt)}
-          </p>
-        </>
+          <span className="small">Starts again {when(period.resetsAt)}</span>
+        </div>
       ) : (
-        <p style={{ margin: 0 }}>
-          Limit per period: <strong>none</strong>
-        </p>
+        <div className="rule">
+          <span>Limit per period</span>
+          <b>None</b>
+        </div>
       )}
-      <p className="muted small" style={{ margin: 0 }}>
-        {pot.confirmedOnly ? "Pays only payees who confirmed their address." : "Pays any approved payee."}
-      </p>
+      <div className="rule">
+        <span>Who can be paid</span>
+        <b>{pot.confirmedOnly ? "Confirmed payees only" : "Any approved payee"}</b>
+      </div>
     </div>
   );
 }
@@ -507,15 +518,40 @@ function Activity({ pot, entries, nameOf }: { pot: Pot; entries?: Entry[]; nameO
   );
 }
 
+const ICON: Record<string, string> = {
+  PotCreated: "✦",
+  PayeeApproved: "+",
+  PayeeRemoved: "−",
+  PayeeRequested: "?",
+  PayeeConfirmed: "✓",
+  Paid: "↗",
+  EndChanged: "⟶",
+  RulesChanged: "≤",
+  FrozenChanged: "❄",
+  Released: "↘",
+  Reclaimed: "↩",
+  Deposit: "↙",
+  BankDeposit: "↙",
+};
+const IN = new Set(["Deposit", "BankDeposit"]);
+
 function HistoryItem({ e, text }: { e: Entry; text: string }) {
   const { crumena } = useApp();
   const [v, setV] = useState<Verification | "busy" | string>();
   return (
     <li>
-      <div className="row between">
-        <span>{text}</span>
-        <span className="row small">
-          <span className="muted">{when(e.time)}</span>
+      <div className="ev">
+        <span className={`ev-icon ${IN.has(e.kind) ? "in" : ""}`} aria-hidden>
+          {ICON[e.kind] ?? "·"}
+        </span>
+        <div className="ev-body">
+          <div>{text}</div>
+          <div className="ev-meta">
+            <span>{when(e.time)}</span>
+            {SIGNED.has(e.kind) && <span>ML-DSA-87 signed</span>}
+          </div>
+        </div>
+        <span className="row small" style={{ flexWrap: "nowrap" }}>
           <ExplorerLink tx={e.tx}>Explorer</ExplorerLink>
           {SIGNED.has(e.kind) && (
             <button

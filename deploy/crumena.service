@@ -1,0 +1,20 @@
+[Unit]
+Description=Crumena relayer and web app
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=crumena
+WorkingDirectory=/opt/crumena/server
+ExecStart=/usr/bin/env node --env-file-if-exists=.env --import tsx src/main.ts
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/crumena/server
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

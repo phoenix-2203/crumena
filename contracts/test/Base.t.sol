@@ -2,7 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {Earmark} from "../src/Earmark.sol";
+import {Crumena} from "../src/Crumena.sol";
 import {MockKeyStatus, MockVerify, MockSig} from "./mocks/MockPqc.sol";
 import {MockToken} from "./mocks/MockToken.sol";
 
@@ -15,7 +15,7 @@ abstract contract Base is Test {
     uint256 internal constant START = 1_795_683_600; // 2026-11-26 09:00 UTC
     uint256 internal constant FUSD = 1e6; // one fUSD in base units
 
-    Earmark internal earmark;
+    Crumena internal crumena;
     MockToken internal token;
 
     address internal funder = makeAddr("funder");
@@ -32,7 +32,7 @@ abstract contract Base is Test {
         vm.warp(START);
         vm.etch(PQC_KEY_STATUS, address(new MockKeyStatus()).code);
         vm.etch(PQC_VERIFY, address(new MockVerify()).code);
-        earmark = new Earmark("qorechain-diana", DIANA);
+        crumena = new Crumena("qorechain-diana", DIANA);
         token = new MockToken();
         _register(funder, 1);
         _register(recipient, 2);
@@ -50,11 +50,11 @@ abstract contract Base is Test {
     }
 
     function _sig(address signer, string memory statement) internal view returns (bytes memory) {
-        return MockSig.sign(keyOf[signer], earmark.signedBytes(statement));
+        return MockSig.sign(keyOf[signer], crumena.signedBytes(statement));
     }
 
-    function _auth(address signer, string memory statement) internal view returns (Earmark.Auth memory) {
-        return Earmark.Auth(earmark.nonceOf(signer), _validUntil(), _sig(signer, statement));
+    function _auth(address signer, string memory statement) internal view returns (Crumena.Auth memory) {
+        return Crumena.Auth(crumena.nonceOf(signer), _validUntil(), _sig(signer, statement));
     }
 
     function _validUntil() internal view returns (uint64) {
@@ -63,7 +63,7 @@ abstract contract Base is Test {
 
     // --------------------------------------------------------------------- pots
 
-    function _newPot() internal view returns (Earmark.NewPot memory p) {
+    function _newPot() internal view returns (Crumena.NewPot memory p) {
         p.funder = funder;
         p.recipient = recipient;
         p.token = address(token);
@@ -77,24 +77,24 @@ abstract contract Base is Test {
         p.names[1] = "Brightline Electrical";
     }
 
-    function _createSigned(Earmark.NewPot memory p) internal returns (uint256 potId) {
-        Earmark.Auth memory a = _createAuth(p);
+    function _createSigned(Crumena.NewPot memory p) internal returns (uint256 potId) {
+        Crumena.Auth memory a = _createAuth(p);
         vm.prank(relayer);
-        potId = earmark.createPot(p, a);
+        potId = crumena.createPot(p, a);
     }
 
     /// @notice The funder's signature for creating `p` (build it before vm.expectRevert).
-    function _createAuth(Earmark.NewPot memory p) internal view returns (Earmark.Auth memory) {
-        uint256 nonce = earmark.nonceOf(p.funder);
-        string memory st = earmark.createStatement(p, nonce, _validUntil());
-        return Earmark.Auth(nonce, _validUntil(), _sig(p.funder, st));
+    function _createAuth(Crumena.NewPot memory p) internal view returns (Crumena.Auth memory) {
+        uint256 nonce = crumena.nonceOf(p.funder);
+        string memory st = crumena.createStatement(p, nonce, _validUntil());
+        return Crumena.Auth(nonce, _validUntil(), _sig(p.funder, st));
     }
 
     /// @notice Expect `createPot(p)`, properly signed, to revert with `reason`.
-    function _expectCreateRevert(Earmark.NewPot memory p, bytes memory reason) internal {
-        Earmark.Auth memory a = _createAuth(p);
+    function _expectCreateRevert(Crumena.NewPot memory p, bytes memory reason) internal {
+        Crumena.Auth memory a = _createAuth(p);
         vm.expectRevert(reason);
-        earmark.createPot(p, a);
+        crumena.createPot(p, a);
     }
 
     /// @notice A pot with `amount` fUSD paid into its vault.
@@ -104,23 +104,23 @@ abstract contract Base is Test {
     }
 
     function _fund(uint256 potId, uint256 amount) internal {
-        token.mint(earmark.potInfo(potId).vault, amount);
+        token.mint(crumena.potInfo(potId).vault, amount);
     }
 
     // ------------------------------------------------------------------ actions
 
     function _pay(uint256 potId, address by, address to, uint256 amount, string memory memo) internal {
-        uint256 nonce = earmark.nonceOf(by);
-        string memory st = earmark.payStatement(potId, to, amount, memo, by, nonce, _validUntil());
-        Earmark.Auth memory a = Earmark.Auth(nonce, _validUntil(), _sig(by, st));
+        uint256 nonce = crumena.nonceOf(by);
+        string memory st = crumena.payStatement(potId, to, amount, memo, by, nonce, _validUntil());
+        Crumena.Auth memory a = Crumena.Auth(nonce, _validUntil(), _sig(by, st));
         vm.prank(relayer);
-        earmark.pay(potId, to, amount, memo, by, a);
+        crumena.pay(potId, to, amount, memo, by, a);
     }
 
     function _addPayee(uint256 potId, address payee, string memory name) internal {
-        Earmark.Auth memory a =
-            _auth(funder, earmark.addPayeeStatement(potId, payee, name, earmark.nonceOf(funder), _validUntil()));
+        Crumena.Auth memory a =
+            _auth(funder, crumena.addPayeeStatement(potId, payee, name, crumena.nonceOf(funder), _validUntil()));
         vm.prank(relayer);
-        earmark.addPayee(potId, payee, name, a);
+        crumena.addPayee(potId, payee, name, a);
     }
 }

@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {Base} from "./Base.t.sol";
-import {Earmark} from "../src/Earmark.sol";
+import {Crumena} from "../src/Crumena.sol";
 import {Text} from "../src/lib/Text.sol";
 
 contract TextHarness {
@@ -125,11 +125,11 @@ contract StatementTest is Base {
         _register(ADA, 12);
         uint256 potId = _fundedPot(1000 * FUSD);
 
-        string memory st = earmark.payStatement(potId, supplierA, 250_500_000, "PO-1042 materials", ADA, 0, uint64(START + 3600));
+        string memory st = crumena.payStatement(potId, supplierA, 250_500_000, "PO-1042 materials", ADA, 0, uint64(START + 3600));
         assertEq(
             st,
             string.concat(
-                "Earmark: pay from pot #1\n",
+                "Crumena: pay from pot #1\n",
                 "Pot: Office fit-out, phase 1\n",
                 "Amount: 250.5 fUSD\n",
                 "To: Halden Building Supplies\n",
@@ -140,24 +140,24 @@ contract StatementTest is Base {
                 "Nonce: 0\n",
                 "Valid until: 2026-11-26 10:00 UTC\n",
                 "Contract: ",
-                Text.hexAddress(address(earmark)),
+                Text.hexAddress(address(crumena)),
                 " on qorechain-diana"
             )
         );
         // and what QoreX actually signs: its fixed prefix, the chain id, then the text
-        assertEq(earmark.signedBytes(st), abi.encodePacked("qorechain-msg-v1|qorechain-diana|", st));
+        assertEq(crumena.signedBytes(st), abi.encodePacked("qorechain-msg-v1|qorechain-diana|", st));
     }
 
     function test_whatTheFunderSignsToCreate() public {
         funder = FUNDER;
         recipient = ADA;
         _register(FUNDER, 11);
-        Earmark.NewPot memory p = _newPot();
-        string memory st = earmark.createStatement(p, 0, uint64(START + 3600));
+        Crumena.NewPot memory p = _newPot();
+        string memory st = crumena.createStatement(p, 0, uint64(START + 3600));
         assertEq(
             st,
             string.concat(
-                "Earmark: create a pot\n",
+                "Crumena: create a pot\n",
                 "Purpose: Office fit-out, phase 1\n",
                 "Spent by: qor168yduth9d3hksddsd54qjt06v9gw9wn40yeg4h\n",
                 "Money: fUSD (",
@@ -170,12 +170,12 @@ contract StatementTest is Base {
                 "\n2. Brightline Electrical, ",
                 Text.hexAddress(supplierB),
                 "\nPot address: ",
-                Text.hexAddress(earmark.vaultFor(FUNDER, 0)),
+                Text.hexAddress(crumena.vaultFor(FUNDER, 0)),
                 "\nSigned by: qor1w3yt7jnev05p4d8e8vgczkdfrd72mxezajpegh\n",
                 "Nonce: 0\n",
                 "Valid until: 2026-11-26 10:00 UTC\n",
                 "Contract: ",
-                Text.hexAddress(address(earmark)),
+                Text.hexAddress(address(crumena)),
                 " on qorechain-diana"
             )
         );
@@ -183,14 +183,14 @@ contract StatementTest is Base {
 
     function test_anEmptyMemoReadsAsADash() public {
         uint256 potId = _fundedPot(10 * FUSD);
-        string memory st = earmark.payStatement(potId, supplierA, FUSD, "", recipient, 0, uint64(START + 60));
+        string memory st = crumena.payStatement(potId, supplierA, FUSD, "", recipient, 0, uint64(START + 60));
         assertTrue(_contains(st, "\nMemo: -\n"));
     }
 
     function test_everyStatementFitsInAQoreXMessage() public {
         // QoreX signs 1 to 4096 bytes. The longest statement is a create with ten
         // payees and every text field at its maximum length.
-        Earmark.NewPot memory p = _newPot();
+        Crumena.NewPot memory p = _newPot();
         p.purpose = _repeat("P", 80);
         p.payees = new address[](10);
         p.names = new string[](10);
@@ -198,7 +198,7 @@ contract StatementTest is Base {
             p.payees[i] = address(uint160(0x9000 + i));
             p.names[i] = _repeat("N", 48);
         }
-        bytes memory signed = earmark.signedBytes(earmark.createStatement(p, type(uint256).max, type(uint64).max));
+        bytes memory signed = crumena.signedBytes(crumena.createStatement(p, type(uint256).max, type(uint64).max));
         assertLt(signed.length, 4097);
     }
 

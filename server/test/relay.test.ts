@@ -3,43 +3,43 @@ import { deriveUnifiedAccount, generateMnemonic } from "@qorechain/sdk";
 import { classicalKeyFromPrivate, signMessage } from "@qorechain/qoresign";
 import { encodeFunctionData, hexToBytes, type Hex } from "viem";
 import { describe, expect, it } from "vitest";
-import { EARMARK_ABI } from "../../shared/earmark-abi";
+import { CRUMENA_ABI } from "../../shared/crumena-abi";
 import { ERROR_TEXT, explainError } from "../../shared/errors";
 import { CHAIN_ID, CONVERT_COIN_TYPE_URL, convertFusdMsg, registry } from "../src/chain";
 import { RELAYED, createRelayer } from "../src/relay";
 
-const EARMARK = "0x00000000000000000000000000000000000e4a2c" as Hex;
-const relayer = createRelayer({} as never, EARMARK, () => {});
+const CRUMENA = "0x00000000000000000000000000000000000e4a2c" as Hex;
+const relayer = createRelayer({} as never, CRUMENA, () => {});
 const auth = { nonce: 0n, validUntil: 1n, signature: "0x" as Hex };
 
 describe("what the relayer sends", () => {
-  it("accepts every signed Earmark action", () => {
-    const data = encodeFunctionData({ abi: EARMARK_ABI, functionName: "pay", args: [1n, EARMARK, 5n, "", EARMARK, auth] });
+  it("accepts every signed Crumena action", () => {
+    const data = encodeFunctionData({ abi: CRUMENA_ABI, functionName: "pay", args: [1n, CRUMENA, 5n, "", CRUMENA, auth] });
     expect(relayer.parse(data)).toBe("pay");
-    const r = encodeFunctionData({ abi: EARMARK_ABI, functionName: "reclaim", args: [1n] });
+    const r = encodeFunctionData({ abi: CRUMENA_ABI, functionName: "reclaim", args: [1n] });
     expect(relayer.parse(r)).toBe("reclaim");
   });
 
-  it("refuses calls that aren't Earmark's", () => {
+  it("refuses calls that aren't Crumena's", () => {
     // ERC-20 transfer(address,uint256): the relayer must never move tokens of its own
     const transfer = ("0xa9059cbb" + "0".repeat(128)) as Hex;
-    expect(() => relayer.parse(transfer)).toThrow(/isn't a call to Earmark/);
+    expect(() => relayer.parse(transfer)).toThrow(/isn't a call to Crumena/);
   });
 
-  it("refuses Earmark functions nobody signs", () => {
-    const view = encodeFunctionData({ abi: EARMARK_ABI, functionName: "balanceOf", args: [1n] });
+  it("refuses Crumena functions nobody signs", () => {
+    const view = encodeFunctionData({ abi: CRUMENA_ABI, functionName: "balanceOf", args: [1n] });
     expect(() => relayer.parse(view)).toThrow(/doesn't send balanceOf/);
   });
 
   it("covers every state-changing function of the contract", () => {
-    const writes = EARMARK_ABI.filter((x) => x.type === "function" && x.stateMutability === "nonpayable").map((x) => (x as { name: string }).name);
+    const writes = CRUMENA_ABI.filter((x) => x.type === "function" && x.stateMutability === "nonpayable").map((x) => (x as { name: string }).name);
     expect([...writes].sort()).toEqual([...RELAYED].sort());
   });
 });
 
 describe("errors in plain words", () => {
   it("explains every error the contract can raise", () => {
-    const errors = EARMARK_ABI.filter((x) => x.type === "error").map((x) => (x as { name: string }).name);
+    const errors = CRUMENA_ABI.filter((x) => x.type === "error").map((x) => (x as { name: string }).name);
     for (const e of errors) expect(ERROR_TEXT[e], e).toBeTruthy();
     expect(explainError("Nope")).toBe("The transaction was refused.");
   });
@@ -47,13 +47,13 @@ describe("errors in plain words", () => {
 
 describe("QoreX's message format", () => {
   it("is the fixed prefix, the chain id, then the text: what the contract rebuilds", () => {
-    const text = "Earmark: pay from pot #1\nAmount: 5 fUSD";
+    const text = "Crumena: pay from pot #1\nAmount: 5 fUSD";
     expect(Buffer.from(messagePqSignBytes(CHAIN_ID, text)).toString("utf8")).toBe(`qorechain-msg-v1|${CHAIN_ID}|${text}`);
   });
 
   it("gives a real ML-DSA-87 signature of the size the contract expects, over those bytes", async () => {
     const acc = await deriveUnifiedAccount(generateMnemonic(256));
-    const text = "Earmark: approve a payee for pot #3\nPayee: Halden Building Supplies";
+    const text = "Crumena: approve a payee for pot #3\nPayee: Halden Building Supplies";
     const sig = signMessage({
       chainId: CHAIN_ID,
       signer: acc.cosmos,

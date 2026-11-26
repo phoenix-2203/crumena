@@ -1,17 +1,17 @@
 /**
- * The relayer. People sign Earmark actions in QoreX (post-quantum, no gas, no EVM
+ * The relayer. People sign Crumena actions in QoreX (post-quantum, no gas, no EVM
  * window of their own); the relayer sends them. It can't change an action: the
  * contract checks every signature itself. What the relayer guards is its own gas:
  *
- * - it only sends calls to the Earmark contract, and only the functions people sign;
+ * - it only sends calls to the Crumena contract, and only the functions people sign;
  * - it simulates each call first and refuses what would revert;
- * - it sends from an EVM window scoped to the Earmark contract alone, a limited
+ * - it sends from an EVM window scoped to the Crumena contract alone, a limited
  *   number of transactions and blocks, and no value: its key can't be used for
  *   anything else on the EVM, even if the server is compromised;
  * - it sends one transaction at a time, and the same call only once.
  */
 import { BaseError, ContractFunctionRevertedError, decodeErrorResult, decodeEventLog, decodeFunctionData, type Hex } from "viem";
-import { EARMARK_ABI } from "../../shared/earmark-abi";
+import { CRUMENA_ABI } from "../../shared/crumena-abi";
 import { explainError } from "../../shared/errors";
 import { MAX_FEE_PER_GAS, PRIORITY_FEE, publicClient, type Account } from "./chain";
 
@@ -40,17 +40,17 @@ export class RelayError extends Error {
   }
 }
 
-export function createRelayer(account: Account, earmark: Hex, log: (s: string) => void = console.log) {
+export function createRelayer(account: Account, crumena: Hex, log: (s: string) => void = console.log) {
   let queue: Promise<unknown> = Promise.resolve();
   const recent = new Map<string, { at: number; result: Promise<RelayResult> }>();
 
-  /** Checks the calldata is an Earmark function the relayer sends, and which. */
+  /** Checks the calldata is an Crumena function the relayer sends, and which. */
   function parse(data: Hex): Relayed {
     let fn: string;
     try {
-      fn = decodeFunctionData({ abi: EARMARK_ABI, data }).functionName;
+      fn = decodeFunctionData({ abi: CRUMENA_ABI, data }).functionName;
     } catch {
-      throw new RelayError("That isn't a call to Earmark.", 400);
+      throw new RelayError("That isn't a call to Crumena.", 400);
     }
     if (!(RELAYED as readonly string[]).includes(fn)) throw new RelayError(`The relayer doesn't send ${fn}.`, 400);
     return fn as Relayed;
@@ -59,7 +59,7 @@ export function createRelayer(account: Account, earmark: Hex, log: (s: string) =
   /** Runs the call against the latest block; throws the contract's reason, in words, if it would revert. */
   async function simulate(data: Hex): Promise<bigint> {
     try {
-      const gas = await publicClient.estimateGas({ account: account.evm, to: earmark, data });
+      const gas = await publicClient.estimateGas({ account: account.evm, to: crumena, data });
       return (gas * 13n) / 10n;
     } catch (e) {
       const reason = revertName(e);
@@ -67,14 +67,14 @@ export function createRelayer(account: Account, earmark: Hex, log: (s: string) =
     }
   }
 
-  /** A window that admits one more call to Earmark, opening a new one when needed. */
+  /** A window that admits one more call to Crumena, opening a new one when needed. */
   async function ensureWindow() {
     const w = await account.window().catch(() => null);
-    const scoped = w?.allowedTargets.length === 1 && w.allowedTargets[0]!.toLowerCase() === earmark.toLowerCase() && !w.nativeOnly;
+    const scoped = w?.allowedTargets.length === 1 && w.allowedTargets[0]!.toLowerCase() === crumena.toLowerCase() && !w.nativeOnly;
     const perTx = (GAS_PER_TX * MAX_FEE_PER_GAS + 999_999_999_999n) / 1_000_000_000_000n;
     if (w?.live && scoped && w.remainingTxs >= 1n && w.remainingBlocks > 5n && w.remainingValue >= perTx) return;
-    const opened = await account.openWindow([earmark], WINDOW_TXS, GAS_PER_TX, WINDOW_BLOCKS);
-    log(`opened an EVM window scoped to ${earmark}: ${WINDOW_TXS} txs, ${WINDOW_BLOCKS} blocks (${opened.transactionHash})`);
+    const opened = await account.openWindow([crumena], WINDOW_TXS, GAS_PER_TX, WINDOW_BLOCKS);
+    log(`opened an EVM window scoped to ${crumena}: ${WINDOW_TXS} txs, ${WINDOW_BLOCKS} blocks (${opened.transactionHash})`);
     await new Promise((r) => setTimeout(r, 2500));
   }
 
@@ -84,7 +84,7 @@ export function createRelayer(account: Account, earmark: Hex, log: (s: string) =
     const hash = await account.wallet.sendTransaction({
       account: account.wallet.account!,
       chain: account.wallet.chain,
-      to: earmark,
+      to: crumena,
       data,
       gas: gas > GAS_PER_TX ? GAS_PER_TX : gas,
       maxFeePerGas: MAX_FEE_PER_GAS,
@@ -95,7 +95,7 @@ export function createRelayer(account: Account, earmark: Hex, log: (s: string) =
     let potId: string | undefined;
     for (const l of rcpt.logs) {
       try {
-        const ev = decodeEventLog({ abi: EARMARK_ABI, data: l.data, topics: l.topics });
+        const ev = decodeEventLog({ abi: CRUMENA_ABI, data: l.data, topics: l.topics });
         if (ev.eventName === "PotCreated") potId = (ev.args as { potId: bigint }).potId.toString();
       } catch {
         /* another contract's log */
@@ -143,5 +143,5 @@ export function revertName(e: unknown): string | undefined {
 }
 
 function decodeErrorName(data: Hex): string | undefined {
-  return decodeErrorResult({ abi: EARMARK_ABI, data }).errorName;
+  return decodeErrorResult({ abi: CRUMENA_ABI, data }).errorName;
 }

@@ -5,7 +5,7 @@ import {Pqc} from "./lib/Pqc.sol";
 import {Text} from "./lib/Text.sol";
 import {PotVault} from "./PotVault.sol";
 
-/// @title Earmark
+/// @title Crumena
 /// @notice Money with a purpose. A funder puts money in a pot for someone (the
 ///         recipient) and names who it may be paid to (the payees). The recipient
 ///         decides when and how much; the contract only ever pays an approved payee.
@@ -19,7 +19,7 @@ import {PotVault} from "./PotVault.sol";
 ///
 ///         Each pot's money sits in its own vault, an address anyone can pay into.
 ///         There is no owner, no admin key, no fee and no upgrade.
-contract Earmark {
+contract Crumena {
     // ------------------------------------------------------------------ types
 
     struct Pot {
@@ -278,7 +278,7 @@ contract Earmark {
     function createStatement(NewPot calldata p, uint256 nonce, uint64 validUntil) public view returns (string memory) {
         (, string memory symbol) = _tokenInfo(p.token);
         string memory s = string.concat(
-            "Earmark: create a pot\nPurpose: ",
+            "Crumena: create a pot\nPurpose: ",
             p.purpose,
             "\nSpent by: ",
             Text.qorAddress(p.recipient),
@@ -309,7 +309,7 @@ contract Earmark {
     ) public view returns (string memory) {
         Pot storage pot = _existing(potId);
         return string.concat(
-            "Earmark: pay from pot #",
+            "Crumena: pay from pot #",
             Text.decimal(potId),
             "\nPot: ",
             pot.purpose,
@@ -334,7 +334,7 @@ contract Earmark {
     {
         Pot storage pot = _existing(potId);
         return string.concat(
-            "Earmark: approve a payee for pot #",
+            "Crumena: approve a payee for pot #",
             Text.decimal(potId),
             "\nPot: ",
             pot.purpose,
@@ -353,7 +353,7 @@ contract Earmark {
     {
         Pot storage pot = _existing(potId);
         return string.concat(
-            "Earmark: stop paying a payee from pot #",
+            "Crumena: stop paying a payee from pot #",
             Text.decimal(potId),
             "\nPot: ",
             pot.purpose,
@@ -372,7 +372,7 @@ contract Earmark {
     {
         Pot storage pot = _existing(potId);
         return string.concat(
-            "Earmark: ask the funder to approve a payee for pot #",
+            "Crumena: ask the funder to approve a payee for pot #",
             Text.decimal(potId),
             "\nPot: ",
             pot.purpose,
@@ -391,7 +391,7 @@ contract Earmark {
     {
         Pot storage pot = _existing(potId);
         return string.concat(
-            "Earmark: confirm this address is mine and can be paid from pot #",
+            "Crumena: confirm this address is mine and can be paid from pot #",
             Text.decimal(potId),
             "\nPot: ",
             pot.purpose,
@@ -410,7 +410,7 @@ contract Earmark {
     {
         Pot storage pot = _existing(potId);
         return string.concat(
-            "Earmark: move the end of pot #",
+            "Crumena: move the end of pot #",
             Text.decimal(potId),
             "\nPot: ",
             pot.purpose,
@@ -423,7 +423,7 @@ contract Earmark {
     function releaseStatement(uint256 potId, uint256 nonce, uint64 validUntil) public view returns (string memory) {
         Pot storage pot = _existing(potId);
         return string.concat(
-            "Earmark: give everything left in pot #",
+            "Crumena: give everything left in pot #",
             Text.decimal(potId),
             " to the person who spends it, with no restrictions, and close the pot\nPot: ",
             pot.purpose,

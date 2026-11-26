@@ -1,11 +1,11 @@
 /**
- * Earmark's server: the relayer, plus read-only proxies the browser needs (the
+ * Crumena's server: the relayer, plus read-only proxies the browser needs (the
  * chain's REST API sends no CORS headers), and the built web app.
  *
- *   RELAYER_MNEMONIC="…" EARMARK_ADDRESS=0x… pnpm --filter @earmark/server start
+ *   RELAYER_MNEMONIC="…" CRUMENA_ADDRESS=0x… pnpm --filter @crumena/server start
  *
  * RELAYER_MNEMONIC is a throwaway testnet account that only pays gas. It never
- * holds anyone's money, and its EVM window only reaches the Earmark contract.
+ * holds anyone's money, and its EVM window only reaches the Crumena contract.
  */
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
@@ -18,20 +18,20 @@ import { RelayError, createRelayer } from "./relay";
 const PORT = Number(process.env.PORT ?? 8790);
 const deployment = (() => {
   const file = new URL("../../deployments/testnet.json", import.meta.url);
-  return existsSync(file) ? (JSON.parse(readFileSync(file, "utf8")) as { Earmark: string; block?: number }) : undefined;
+  return existsSync(file) ? (JSON.parse(readFileSync(file, "utf8")) as { Crumena: string; block?: number }) : undefined;
 })();
-const EARMARK = getAddress(process.env.EARMARK_ADDRESS ?? deployment?.Earmark ?? "0x0000000000000000000000000000000000000000");
+const CRUMENA = getAddress(process.env.CRUMENA_ADDRESS ?? deployment?.Crumena ?? "0x0000000000000000000000000000000000000000");
 const mnemonic = process.env.RELAYER_MNEMONIC?.trim();
 if (!mnemonic) throw new Error("Set RELAYER_MNEMONIC to a throwaway testnet phrase (in server/.env).");
 
 const account = await useAccount(mnemonic, { maxQor: 200n });
-const relayer = createRelayer(account, EARMARK);
-console.log(`Earmark relayer ${account.qor} (${account.evm}) for ${EARMARK} on ${CHAIN_ID}`);
+const relayer = createRelayer(account, CRUMENA);
+console.log(`Crumena relayer ${account.qor} (${account.evm}) for ${CRUMENA} on ${CHAIN_ID}`);
 
 const app = new Hono();
 
 app.get("/api/config", (c) =>
-  c.json({ chainId: CHAIN_ID, evmChainId: EVM_CHAIN_ID, earmark: EARMARK, fusd: FUSD, relayer: account.qor, fromBlock: deployment?.block ?? 0 }),
+  c.json({ chainId: CHAIN_ID, evmChainId: EVM_CHAIN_ID, crumena: CRUMENA, fusd: FUSD, relayer: account.qor, fromBlock: deployment?.block ?? 0 }),
 );
 
 app.get("/api/health", async (c) => {

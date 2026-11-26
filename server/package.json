@@ -1,8 +1,8 @@
 {
-  "name": "@earmark/server",
+  "name": "@crumena/server",
   "version": "0.1.0",
   "private": true,
-  "description": "Earmark's relayer: sends post-quantum signed actions to the Earmark contract, from a scoped EVM window.",
+  "description": "Crumena's relayer: sends post-quantum signed actions to the Crumena contract, from a scoped EVM window.",
   "license": "MIT",
   "type": "module",
   "scripts": {

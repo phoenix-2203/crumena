@@ -135,7 +135,7 @@ export async function useAccount(mnemonicOrAccount: string | UnifiedAccount, opt
       sequence: BigInt(a.account.sequence),
       fee: NATIVE_FEE,
       messages: messages as never,
-      memo: `earmark: ${label}`,
+      memo: `crumena: ${label}`,
     })) as Included;
     if (res.code !== 0) throw new Error(`${label} failed (code ${res.code}): ${res.rawLog}`);
     return res;
@@ -190,7 +190,7 @@ export async function registerPqcKey(acc: UnifiedAccount): Promise<string> {
     sequence: BigInt(a.account.sequence),
     fee: NATIVE_FEE,
     messages: [buildRegisterPqcKeyMsg(acc.cosmos, { pqcKeypair: acc.pqc, proofOfPossession })] as never,
-    memo: "earmark: register post-quantum key",
+    memo: "crumena: register post-quantum key",
   })) as Included;
   if (res.code !== 0) throw new Error(`Registering the post-quantum key failed (code ${res.code}): ${res.rawLog}`);
   return res.transactionHash;

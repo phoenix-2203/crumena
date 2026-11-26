@@ -1,8 +1,8 @@
 /**
- * The live testnet run: Earmark end to end on qorechain-diana, with real ML-DSA-87
+ * The live testnet run: Crumena end to end on qorechain-diana, with real ML-DSA-87
  * signatures checked by the chain's own precompiles, then the attacks it must stop.
  *
- *   pnpm --filter @earmark/server testnet:run
+ *   pnpm --filter @crumena/server testnet:run
  *
  * Uses the throwaway account in server/.env.seed (E2E_MNEMONIC), which needs about
  * 3 test QOR and 150 test fUSD from the faucet. It makes four fresh accounts (a
@@ -12,7 +12,7 @@
 import { EthNativeSigner, deriveUnifiedAccount, generateMnemonic, openEvmWindowMsg } from "@qorechain/sdk";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { encodeFunctionData, getAddress, type Hex } from "viem";
-import { EARMARK_ABI } from "../../shared/earmark-abi";
+import { CRUMENA_ABI } from "../../shared/crumena-abi";
 import {
   CHAIN_ID,
   FUSD,
@@ -32,8 +32,8 @@ import {
 } from "../src/chain";
 import { createRelayer, revertName } from "../src/relay";
 
-const deployment = JSON.parse(readFileSync(new URL("../../deployments/testnet.json", import.meta.url), "utf8")) as { Earmark: Hex };
-const EARMARK = getAddress(deployment.Earmark);
+const deployment = JSON.parse(readFileSync(new URL("../../deployments/testnet.json", import.meta.url), "utf8")) as { Crumena: Hex };
+const CRUMENA = getAddress(deployment.Crumena);
 const mnemonic = process.env.E2E_MNEMONIC?.trim();
 if (!mnemonic) throw new Error('Put a THROWAWAY testnet phrase in server/.env.seed as E2E_MNEMONIC="…".');
 
@@ -50,13 +50,13 @@ const erc20 = [
 ] as const;
 const fusdOf = (a: Hex) => publicClient.readContract({ address: FUSD, abi: erc20, functionName: "balanceOf", args: [a] });
 const read = <T>(functionName: string, args: unknown[]) =>
-  publicClient.readContract({ address: EARMARK, abi: EARMARK_ABI, functionName: functionName as never, args: args as never }) as Promise<T>;
+  publicClient.readContract({ address: CRUMENA, abi: CRUMENA_ABI, functionName: functionName as never, args: args as never }) as Promise<T>;
 
 // ------------------------------------------------------------------ the cast
 
 const main = await useAccount(mnemonic, { maxQor: 200n });
-const relayer = createRelayer(main, EARMARK, (s) => console.log(`      relayer: ${s}`));
-console.log(`Earmark ${EARMARK} on ${CHAIN_ID}\n  run by ${main.qor}\n`);
+const relayer = createRelayer(main, CRUMENA, (s) => console.log(`      relayer: ${s}`));
+console.log(`Crumena ${CRUMENA} on ${CHAIN_ID}\n  run by ${main.qor}\n`);
 
 async function fresh(label: string, withKey: boolean, uqor = 400_000n): Promise<Account> {
   const u = await deriveUnifiedAccount(generateMnemonic(256));
@@ -79,7 +79,7 @@ const until = () => BigInt(Math.floor(Date.now() / 1000) + 3600);
 const nonce = (a: Account) => read<bigint>("nonceOf", [a.evm]);
 
 async function relay(fn: string, args: unknown[]) {
-  const data = encodeFunctionData({ abi: EARMARK_ABI, functionName: fn as never, args: args as never });
+  const data = encodeFunctionData({ abi: CRUMENA_ABI, functionName: fn as never, args: args as never });
   return relayer.relay(data);
 }
 
@@ -169,21 +169,21 @@ const winTry = (await classicalOnly.signAndBroadcast(transport, {
   accountNumber: BigInt(acct.account.account_number),
   sequence: BigInt(acct.account.sequence),
   fee: NATIVE_FEE,
-  messages: [openEvmWindowMsg({ sender: funder.qor, blocks: 100, maxTxs: 1, maxValue: "1000000", allowedTargets: [EARMARK] })] as never,
-  memo: "earmark drill: window with the classical key only",
+  messages: [openEvmWindowMsg({ sender: funder.qor, blocks: 100, maxTxs: 1, maxValue: "1000000", allowedTargets: [CRUMENA] })] as never,
+  memo: "crumena drill: window with the classical key only",
 })) as { code: number; transactionHash: string; rawLog?: string };
 record("Attack: open an EVM window with the funder's stolen classical key only", winTry.code !== 0, `refused by the chain (code ${winTry.code}): ${(winTry.rawLog ?? "").slice(0, 160)}`, winTry.transactionHash);
 
 // b. Even inside a window the funder opened, the classical key can't add a payee.
-await funder.openWindow([EARMARK], 1, 1_500_000n, 100);
+await funder.openWindow([CRUMENA], 1, 1_500_000n, 100);
 await sleep(3000);
 n = await nonce(funder);
 const garbage = ("0x" + "00".repeat(4627)) as Hex;
 const evmTry = await funder.wallet.sendTransaction({
   account: funder.wallet.account!,
   chain: funder.wallet.chain,
-  to: EARMARK,
-  data: encodeFunctionData({ abi: EARMARK_ABI, functionName: "addPayee", args: [potId, attacker.evm, "Totally legit", { nonce: n, validUntil: until(), signature: garbage }] }),
+  to: CRUMENA,
+  data: encodeFunctionData({ abi: CRUMENA_ABI, functionName: "addPayee", args: [potId, attacker.evm, "Totally legit", { nonce: n, validUntil: until(), signature: garbage }] }),
   gas: 1_500_000n,
   maxFeePerGas: MAX_FEE_PER_GAS,
   maxPriorityFeePerGas: PRIORITY_FEE,
@@ -243,7 +243,7 @@ writeFileSync(
     {
       at: new Date().toISOString(),
       chainId: CHAIN_ID,
-      earmark: EARMARK,
+      crumena: CRUMENA,
       potId: potId.toString(),
       accounts: { funder: funder.qor, spender: spender.qor, shopA: shopA.qor, shopB: shopB.qor, attacker: attacker.qor, relayer: main.qor },
       steps,

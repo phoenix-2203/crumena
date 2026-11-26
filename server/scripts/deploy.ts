@@ -1,7 +1,7 @@
 /**
- * Deploy Earmark to the QoreChain TESTNET from a throwaway account:
+ * Deploy Crumena to the QoreChain TESTNET from a throwaway account:
  *
- *   pnpm --filter @earmark/server deploy:testnet
+ *   pnpm --filter @crumena/server deploy:testnet
  *
  * The phrase is read from server/.env.seed (git-ignored) as E2E_MNEMONIC="…".
  * Never use a phrase that holds real funds. The script:
@@ -14,7 +14,7 @@
 import { execSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { getAddress } from "viem";
-import { EARMARK_ABI, EARMARK_BYTECODE } from "../../shared/earmark-abi";
+import { CRUMENA_ABI, CRUMENA_BYTECODE } from "../../shared/crumena-abi";
 import { CHAIN_ID, EVM_CHAIN_ID, MAX_FEE_PER_GAS, PRIORITY_FEE, explorerTx, hasPqcKey, publicClient, registerPqcKey, useAccount } from "../src/chain";
 
 const GAS = 6_000_000n;
@@ -22,7 +22,7 @@ const mnemonic = process.env.E2E_MNEMONIC?.trim();
 if (!mnemonic) throw new Error('Put a THROWAWAY testnet phrase in server/.env.seed as E2E_MNEMONIC="…".');
 
 const me = await useAccount(mnemonic, { maxQor: 200n });
-console.log(`Deploying Earmark from ${me.qor} (${me.evm}) to ${CHAIN_ID}`);
+console.log(`Deploying Crumena from ${me.qor} (${me.evm}) to ${CHAIN_ID}`);
 if (!(await hasPqcKey(me.qor))) {
   console.log(`  registering its ML-DSA-87 key: ${await registerPqcKey(me.unified)}`);
   await new Promise((r) => setTimeout(r, 3000));
@@ -35,8 +35,8 @@ await new Promise((r) => setTimeout(r, 4000));
 const hash = await me.wallet.deployContract({
   account: me.wallet.account!,
   chain: me.wallet.chain,
-  abi: EARMARK_ABI,
-  bytecode: EARMARK_BYTECODE,
+  abi: CRUMENA_ABI,
+  bytecode: CRUMENA_BYTECODE,
   args: [CHAIN_ID, BigInt(EVM_CHAIN_ID)],
   gas: GAS,
   maxFeePerGas: MAX_FEE_PER_GAS,
@@ -48,9 +48,9 @@ const address = getAddress(rcpt.contractAddress);
 console.log(`  deployed: ${address} (tx ${hash}, block ${rcpt.blockNumber}, ${rcpt.gasUsed} gas)`);
 
 const [name, evmChainId, count] = await Promise.all([
-  publicClient.readContract({ address, abi: EARMARK_ABI, functionName: "chainName" }),
-  publicClient.readContract({ address, abi: EARMARK_ABI, functionName: "evmChainId" }),
-  publicClient.readContract({ address, abi: EARMARK_ABI, functionName: "potCount" }),
+  publicClient.readContract({ address, abi: CRUMENA_ABI, functionName: "chainName" }),
+  publicClient.readContract({ address, abi: CRUMENA_ABI, functionName: "evmChainId" }),
+  publicClient.readContract({ address, abi: CRUMENA_ABI, functionName: "potCount" }),
 ]);
 if (name !== CHAIN_ID || evmChainId !== BigInt(EVM_CHAIN_ID) || count !== 0n) throw new Error("the deployed contract doesn't read back as expected");
 
@@ -68,7 +68,7 @@ writeFileSync(
     {
       chainId: CHAIN_ID,
       evmChainId: EVM_CHAIN_ID,
-      Earmark: address,
+      Crumena: address,
       deployTx: hash,
       block: Number(rcpt.blockNumber),
       deployer: me.qor,

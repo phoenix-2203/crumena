@@ -14,7 +14,16 @@ const sign = async () => {
   await page.getByRole("button", { name: /^Sign as/ }).click();
   await page.getByRole("dialog").waitFor({ state: "detached" });
 };
-const toast = async () => (await page.getByRole("status").textContent({ timeout: 20000 }))?.trim();
+let lastToast = "";
+const toast = async () => {
+  // wait for a toast that differs from the last one read, so each step reports its own result
+  for (let i = 0; i < 80; i++) {
+    const t = (await page.getByRole("status").textContent({ timeout: 20000 }).catch(() => ""))?.trim() ?? "";
+    if (t && t !== lastToast) return (lastToast = t);
+    await page.waitForTimeout(250);
+  }
+  return lastToast;
+};
 const as = (r) => page.locator(".demo-bar").getByRole("button", { name: r, exact: true }).click();
 
 await page.goto(base);
@@ -37,19 +46,19 @@ await page.getByText("50 fUSD").first().waitFor();
 await shot("04-pot-funder");
 
 await as("Spender");
-await page.getByLabel(/Amount \(fUSD\)/).fill("12.5");
+await page.getByLabel(/^Amount \(fUSD\)/).first().fill("12.5");
 await page.getByLabel(/Note/).fill("Invoice 1042");
 await page.getByRole("button", { name: "Review and sign" }).first().click();
 await sign();
 console.log("pay:", await toast());
-await page.getByLabel(/Amount \(fUSD\)/).fill("25");
+await page.getByLabel(/^Amount \(fUSD\)/).first().fill("25");
 await page.getByRole("button", { name: "Review and sign" }).first().click();
 await sign(); // signed, but the contract refuses it: over the 20 fUSD cap
 console.log("over cap:", await toast());
 await page.waitForTimeout(500);
 await shot("05-pot-spender");
 
-await as("Vendor");
+await as("Payee");
 await page.getByRole("button", { name: /^Confirm as/ }).click();
 await sign();
 console.log("confirm:", await toast());
@@ -67,6 +76,12 @@ await paid.getByRole("button", { name: "Verify" }).click();
 await paid.getByText(/Valid ML-DSA-87 signature|does not check out/).waitFor({ timeout: 20000 });
 console.log("verify:", (await paid.locator(".pill").first().textContent())?.trim());
 await shot("06-pot-funder-history");
+await paid.getByRole("link", { name: "Receipt" }).click();
+await page.getByText("Payment receipt").waitFor({ timeout: 20000 });
+await page.getByText(/Valid ML-DSA-87 signature|doesn't check out/).waitFor({ timeout: 30000 });
+console.log("receipt:", (await page.locator(".receipt-check .pill").textContent())?.trim(), page.url().replace(base, ""));
+await shot("09-receipt");
+await page.goBack();
 
 await page.setViewportSize({ width: 390, height: 844 });
 await shot("07-mobile");

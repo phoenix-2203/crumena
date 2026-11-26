@@ -77,7 +77,7 @@ contract PotHandler is Test {
         } catch {}
         Crumena.Auth memory b = Crumena.Auth(crumena.nonceOf(funder), uint64(block.timestamp + 1 hours), new bytes(4627));
         vm.prank(funder);
-        try crumena.addPayee(potId, attacker, "Attacker", b) {
+        try crumena.addPayee(potId, attacker, "Attacker", 0, b) {
             attackerSuccesses++;
         } catch {}
     }
@@ -92,8 +92,8 @@ contract PotHandler is Test {
             string memory st = crumena.removePayeeStatement(potId, shop, nonce, until);
             crumena.removePayee(potId, shop, Crumena.Auth(nonce, until, _sign(funder, st)));
         } else {
-            string memory st = crumena.addPayeeStatement(potId, shop, "Shop", nonce, until);
-            crumena.addPayee(potId, shop, "Shop", Crumena.Auth(nonce, until, _sign(funder, st)));
+            string memory st = crumena.addPayeeStatement(potId, shop, "Shop", 0, nonce, until);
+            crumena.addPayee(potId, shop, "Shop", 0, Crumena.Auth(nonce, until, _sign(funder, st)));
         }
     }
 
@@ -137,7 +137,9 @@ contract InvariantTest is Base {
 
     function setUp() public override {
         super.setUp();
-        potId = _createSigned(_newPot());
+        Crumena.NewPot memory p = _newPot();
+        p.limits[0] = 40 * FUSD; // one shop with a limit, one without
+        potId = _createSigned(p);
         address[] memory shops = new address[](3);
         shops[0] = supplierA;
         shops[1] = supplierB;
@@ -170,6 +172,19 @@ contract InvariantTest is Base {
     /// Crumena itself never holds money; pots do.
     function invariant_crumenaHoldsNothing() public view {
         assertEq(token.balanceOf(address(crumena)), 0);
+    }
+
+    /// Each shop's own count matches what it received, the counts add up to the pot's
+    /// total, and no shop ever gets more than its limit.
+    function invariant_eachPayeesCountIsExact() public view {
+        uint256 sum;
+        for (uint256 i; i < handler.shopCount(); ++i) {
+            Crumena.Payee memory p = crumena.payeeInfo(potId, handler.shopAt(i));
+            assertEq(p.paid, token.balanceOf(handler.shopAt(i)));
+            if (p.limit != 0) assertLe(p.paid, p.limit);
+            sum += p.paid;
+        }
+        assertEq(sum, crumena.potInfo(potId).paidOut);
     }
 
     /// The pot never pays out more than was paid in.

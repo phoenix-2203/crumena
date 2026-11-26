@@ -55,7 +55,7 @@ contract CreatePotTest is Base {
             1, funder, recipient, crumena.vaultFor(funder, 0), address(token), p.endsAt, false, p.purpose
         );
         vm.expectEmit(true, true, false, true, address(crumena));
-        emit Crumena.PayeeApproved(1, supplierA, "Halden Building Supplies");
+        emit Crumena.PayeeApproved(1, supplierA, "Halden Building Supplies", 0);
         _createSigned(p);
     }
 
@@ -117,10 +117,12 @@ contract CreatePotTest is Base {
         Crumena.NewPot memory p = _newPot();
         p.payees = new address[](0);
         p.names = new string[](0);
+        p.limits = new uint256[](0);
         _expectCreateRevert(p, abi.encodeWithSelector(Crumena.TooManyPayees.selector));
 
         p.payees = new address[](11);
         p.names = new string[](11);
+        p.limits = new uint256[](11);
         for (uint256 i; i < 11; ++i) {
             p.payees[i] = address(uint160(0x1000 + i));
             p.names[i] = "Shop";
@@ -131,6 +133,7 @@ contract CreatePotTest is Base {
     function test_rejectsMismatchedNames() public {
         Crumena.NewPot memory p = _newPot();
         p.names = new string[](1);
+        p.limits = new uint256[](1);
         p.names[0] = "Halden";
         vm.expectRevert(Crumena.TooManyPayees.selector);
         crumena.createPot(p, Crumena.Auth(0, _validUntil(), new bytes(4627)));

@@ -75,6 +75,7 @@ abstract contract Base is Test {
         p.names = new string[](2);
         p.names[0] = "Halden Building Supplies";
         p.names[1] = "Brightline Electrical";
+        p.limits = new uint256[](2); // no limit per payee
     }
 
     function _createSigned(Crumena.NewPot memory p) internal returns (uint256 potId) {
@@ -118,9 +119,20 @@ abstract contract Base is Test {
     }
 
     function _addPayee(uint256 potId, address payee, string memory name) internal {
+        _addPayee(potId, payee, name, 0);
+    }
+
+    function _addPayee(uint256 potId, address payee, string memory name, uint256 limit) internal {
         Crumena.Auth memory a =
-            _auth(funder, crumena.addPayeeStatement(potId, payee, name, crumena.nonceOf(funder), _validUntil()));
+            _auth(funder, crumena.addPayeeStatement(potId, payee, name, limit, crumena.nonceOf(funder), _validUntil()));
         vm.prank(relayer);
-        crumena.addPayee(potId, payee, name, a);
+        crumena.addPayee(potId, payee, name, limit, a);
+    }
+
+    function _setPayeeLimit(uint256 potId, address payee, uint256 limit) internal {
+        Crumena.Auth memory a =
+            _auth(funder, crumena.payeeLimitStatement(potId, payee, limit, crumena.nonceOf(funder), _validUntil()));
+        vm.prank(relayer);
+        crumena.setPayeeLimit(potId, payee, limit, a);
     }
 }

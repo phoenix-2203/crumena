@@ -153,6 +153,7 @@ contract StatementTest is Base {
         recipient = ADA;
         _register(FUNDER, 11);
         Crumena.NewPot memory p = _newPot();
+        p.limits[0] = 30 * FUSD;
         string memory st = crumena.createStatement(p, 0, uint64(START + 3600));
         assertEq(
             st,
@@ -169,8 +170,10 @@ contract StatementTest is Base {
                 "Payees:\n",
                 "1. Halden Building Supplies, ",
                 Text.hexAddress(supplierA),
+                ", up to 30 fUSD",
                 "\n2. Brightline Electrical, ",
                 Text.hexAddress(supplierB),
+                ", no limit",
                 "\nPot address: ",
                 Text.hexAddress(crumena.vaultFor(FUNDER, 0)),
                 "\nSigned by: qor1w3yt7jnev05p4d8e8vgczkdfrd72mxezajpegh\n",
@@ -238,9 +241,11 @@ contract StatementTest is Base {
         p.rules = Crumena.Rules({maxPerPayment: type(uint256).max, periodLimit: type(uint256).max, periodDays: 366});
         p.payees = new address[](10);
         p.names = new string[](10);
+        p.limits = new uint256[](10);
         for (uint256 i; i < 10; ++i) {
             p.payees[i] = address(uint160(0x9000 + i));
             p.names[i] = _repeat("N", 48);
+            p.limits[i] = type(uint256).max;
         }
         bytes memory signed = crumena.signedBytes(crumena.createStatement(p, type(uint256).max, type(uint64).max));
         assertLt(signed.length, 4097);

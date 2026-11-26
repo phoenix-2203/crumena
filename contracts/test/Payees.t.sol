@@ -27,10 +27,10 @@ contract PayeesTest is Base {
 
     function test_onlyTheFundersKeyCanApprove() public {
         uint256 nonce = crumena.nonceOf(funder);
-        string memory st = crumena.addPayeeStatement(potId, stranger, "Me", nonce, _validUntil());
+        string memory st = crumena.addPayeeStatement(potId, stranger, "Me", 0, nonce, _validUntil());
         Crumena.Auth memory forged = Crumena.Auth(nonce, _validUntil(), _sig(recipient, st));
         vm.expectRevert(abi.encodeWithSignature("BadPqcSignature(address)", funder));
-        crumena.addPayee(potId, stranger, "Me", forged);
+        crumena.addPayee(potId, stranger, "Me", 0, forged);
     }
 
     function test_aStolenClassicalKeyCantAddAPayee() public {
@@ -39,30 +39,30 @@ contract PayeesTest is Base {
         Crumena.Auth memory noPq = Crumena.Auth(crumena.nonceOf(funder), _validUntil(), new bytes(4627));
         vm.prank(funder);
         vm.expectRevert(abi.encodeWithSignature("BadPqcSignature(address)", funder));
-        crumena.addPayee(potId, stranger, "Totally legit", noPq);
+        crumena.addPayee(potId, stranger, "Totally legit", 0, noPq);
         assertFalse(crumena.payeeInfo(potId, stranger).approved);
     }
 
     function test_cantApproveTwice() public {
         Crumena.Auth memory a =
-            _auth(funder, crumena.addPayeeStatement(potId, supplierA, "Again", crumena.nonceOf(funder), _validUntil()));
+            _auth(funder, crumena.addPayeeStatement(potId, supplierA, "Again", 0, crumena.nonceOf(funder), _validUntil()));
         vm.expectRevert(Crumena.AlreadyApproved.selector);
-        crumena.addPayee(potId, supplierA, "Again", a);
+        crumena.addPayee(potId, supplierA, "Again", 0, a);
     }
 
     function test_cantApproveTheRecipient() public {
         Crumena.Auth memory a =
-            _auth(funder, crumena.addPayeeStatement(potId, recipient, "Me", crumena.nonceOf(funder), _validUntil()));
+            _auth(funder, crumena.addPayeeStatement(potId, recipient, "Me", 0, crumena.nonceOf(funder), _validUntil()));
         vm.expectRevert(Crumena.BadAddress.selector);
-        crumena.addPayee(potId, recipient, "Me", a);
+        crumena.addPayee(potId, recipient, "Me", 0, a);
     }
 
     function test_cantApproveThePotsOwnVault() public {
         address vault = crumena.potInfo(potId).vault;
         Crumena.Auth memory a =
-            _auth(funder, crumena.addPayeeStatement(potId, vault, "Loop", crumena.nonceOf(funder), _validUntil()));
+            _auth(funder, crumena.addPayeeStatement(potId, vault, "Loop", 0, crumena.nonceOf(funder), _validUntil()));
         vm.expectRevert(Crumena.BadAddress.selector);
-        crumena.addPayee(potId, vault, "Loop", a);
+        crumena.addPayee(potId, vault, "Loop", 0, a);
     }
 
     // ---------------------------------------------------------------- remove
@@ -109,9 +109,9 @@ contract PayeesTest is Base {
     function test_recipientAsksAndFunderApproves() public {
         Crumena.Auth memory r = _auth(
             recipient,
-            crumena.requestPayeeStatement(potId, newShop, "Okafor Hardware", crumena.nonceOf(recipient), _validUntil())
+            crumena.requestPayeeStatement(potId, newShop, "Okafor Hardware", 10 * FUSD, crumena.nonceOf(recipient), _validUntil())
         );
-        crumena.requestPayee(potId, newShop, "Okafor Hardware", r);
+        crumena.requestPayee(potId, newShop, "Okafor Hardware", 10 * FUSD, r);
         Crumena.Payee memory p = crumena.payeeInfo(potId, newShop);
         assertTrue(p.requested);
         assertFalse(p.approved, "asking is not approving");
@@ -126,26 +126,26 @@ contract PayeesTest is Base {
 
     function test_onlyTheRecipientCanAsk() public {
         uint256 nonce = crumena.nonceOf(recipient);
-        string memory st = crumena.requestPayeeStatement(potId, newShop, "Shop", nonce, _validUntil());
+        string memory st = crumena.requestPayeeStatement(potId, newShop, "Shop", 10 * FUSD, nonce, _validUntil());
         Crumena.Auth memory a = Crumena.Auth(nonce, _validUntil(), _sig(stranger, st));
         vm.expectRevert(abi.encodeWithSignature("BadPqcSignature(address)", recipient));
-        crumena.requestPayee(potId, newShop, "Shop", a);
+        crumena.requestPayee(potId, newShop, "Shop", 10 * FUSD, a);
     }
 
     function test_cantAskForAnAlreadyApprovedPayee() public {
         Crumena.Auth memory a = _auth(
-            recipient, crumena.requestPayeeStatement(potId, supplierA, "A", crumena.nonceOf(recipient), _validUntil())
+            recipient, crumena.requestPayeeStatement(potId, supplierA, "A", 10 * FUSD, crumena.nonceOf(recipient), _validUntil())
         );
         vm.expectRevert(Crumena.AlreadyApproved.selector);
-        crumena.requestPayee(potId, supplierA, "A", a);
+        crumena.requestPayee(potId, supplierA, "A", 10 * FUSD, a);
     }
 
     function test_recipientCantAskToPayThemselves() public {
         Crumena.Auth memory a = _auth(
-            recipient, crumena.requestPayeeStatement(potId, recipient, "Me", crumena.nonceOf(recipient), _validUntil())
+            recipient, crumena.requestPayeeStatement(potId, recipient, "Me", 10 * FUSD, crumena.nonceOf(recipient), _validUntil())
         );
         vm.expectRevert(Crumena.BadAddress.selector);
-        crumena.requestPayee(potId, recipient, "Me", a);
+        crumena.requestPayee(potId, recipient, "Me", 10 * FUSD, a);
     }
 
     // --------------------------------------------------------------- confirm
@@ -182,9 +182,9 @@ contract PayeesTest is Base {
     function test_atMostFiftyPayees() public {
         for (uint256 i; i < 48; ++i) _addPayee(potId, address(uint160(0x5000 + i)), "Shop");
         Crumena.Auth memory a =
-            _auth(funder, crumena.addPayeeStatement(potId, stranger, "One more", crumena.nonceOf(funder), _validUntil()));
+            _auth(funder, crumena.addPayeeStatement(potId, stranger, "One more", 0, crumena.nonceOf(funder), _validUntil()));
         vm.expectRevert(Crumena.TooManyPayees.selector);
-        crumena.addPayee(potId, stranger, "One more", a);
+        crumena.addPayee(potId, stranger, "One more", 0, a);
     }
 
     function _confirm(address payee) internal {

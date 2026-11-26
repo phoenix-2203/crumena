@@ -214,9 +214,9 @@ contract AuditTest is Base {
         assertEq(list.length, 50);
 
         address extra = address(uint160(0xB000));
-        Crumena.Auth memory a = _auth(funder, crumena.addPayeeStatement(potId, extra, "Shop", crumena.nonceOf(funder), _validUntil()));
+        Crumena.Auth memory a = _auth(funder, crumena.addPayeeStatement(potId, extra, "Shop", 0, crumena.nonceOf(funder), _validUntil()));
         vm.expectRevert(Crumena.TooManyPayees.selector);
-        crumena.addPayee(potId, extra, "Shop", a);
+        crumena.addPayee(potId, extra, "Shop", 0, a);
 
         // Removing and approving the same address again doesn't add a second entry.
         address again = address(uint160(0xA000));
@@ -233,10 +233,10 @@ contract AuditTest is Base {
     function test_qcai5_aFailedSignatureChangesNothing() public {
         uint256 potId = _fundedPot(10 * FUSD);
         uint256 nonce = crumena.nonceOf(funder);
-        string memory st = crumena.addPayeeStatement(potId, stranger, "Totally legit", nonce, _validUntil());
+        string memory st = crumena.addPayeeStatement(potId, stranger, "Totally legit", 0, nonce, _validUntil());
         Crumena.Auth memory a = Crumena.Auth(nonce, _validUntil(), _sig(recipient, st));
         vm.expectRevert(abi.encodeWithSignature("BadPqcSignature(address)", funder));
-        crumena.addPayee(potId, stranger, "Totally legit", a);
+        crumena.addPayee(potId, stranger, "Totally legit", 0, a);
         assertFalse(crumena.payeeInfo(potId, stranger).approved);
         (address[] memory list,) = crumena.payeesOf(potId);
         assertEq(list.length, 2);
@@ -316,6 +316,7 @@ contract AuditTest is Base {
         Crumena.NewPot memory p = _newPot();
         p.payees = new address[](11);
         p.names = new string[](11);
+        p.limits = new uint256[](11);
         for (uint256 i; i < 11; ++i) {
             p.payees[i] = address(uint160(0xC000 + i));
             p.names[i] = "Shop";
@@ -324,6 +325,7 @@ contract AuditTest is Base {
 
         p.payees = new address[](10);
         p.names = new string[](10);
+        p.limits = new uint256[](10);
         for (uint256 i; i < 10; ++i) {
             p.payees[i] = address(uint160(0xC000 + i));
             p.names[i] = "Shop";

@@ -263,8 +263,9 @@ record("Attack: a properly signed payment to an address the funder never approve
 
 // f. Change the amount after signing.
 const goodText = await read<string>("payStatement", [potId, shopA.evm, FUSD_UNIT, "", spender.evm, n, v]);
-const f = await refused("pay", [potId, shopA.evm, 50n * FUSD_UNIT, "", spender.evm, { nonce: n, validUntil: v, signature: spender.signText(goodText) }]);
-record("Attack: raise the amount after the spender signed 1 fUSD", f === "BadPqcSignature", `refused: ${f}`);
+// 20 fUSD stays inside the pot's limits, so only the signature can refuse it.
+const f = await refused("pay", [potId, shopA.evm, 20n * FUSD_UNIT, "", spender.evm, { nonce: n, validUntil: v, signature: spender.signText(goodText) }]);
+record("Attack: raise the amount to 20 fUSD after the spender signed 1 fUSD", f === "BadPqcSignature", `refused: ${f}`);
 
 // ------------------------------------------------------------- 7. the rules hold
 

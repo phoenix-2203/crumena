@@ -1,0 +1,13 @@
+{
+  "name": "earmark-qorechain",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@10.12.1",
+  "scripts": {
+    "build:contracts": "cd contracts && forge build && node ../scripts/gen-abi.mjs",
+    "test:contracts": "cd contracts && forge test",
+    "test": "pnpm test:contracts && pnpm -r test",
+    "typecheck": "pnpm -r typecheck"
+  }
+}

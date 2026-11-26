@@ -44,7 +44,7 @@ export function createRelayer(account: Account, crumena: Hex, log: (s: string) =
   let queue: Promise<unknown> = Promise.resolve();
   const recent = new Map<string, { at: number; result: Promise<RelayResult> }>();
 
-  /** Checks the calldata is an Crumena function the relayer sends, and which. */
+  /** Checks the calldata is a Crumena function the relayer sends, and which. */
   function parse(data: Hex): Relayed {
     let fn: string;
     try {

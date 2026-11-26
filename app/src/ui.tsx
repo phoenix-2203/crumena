@@ -266,7 +266,7 @@ export function ExplorerLink({ tx, children }: { tx: string; children?: ReactNod
 }
 
 export function Qr({ text }: { text: string }) {
-  return <div className="qr" aria-label={`QR code for ${text}`} dangerouslySetInnerHTML={{ __html: renderSVG(text, { border: 1 }) }} />;
+  return <div className="qr" role="img" aria-label={`QR code for ${text}`} dangerouslySetInnerHTML={{ __html: renderSVG(text, { border: 1 }) }} />;
 }
 
 export function NeedsSigner({ children }: { children: ReactNode }) {

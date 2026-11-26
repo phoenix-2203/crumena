@@ -27,7 +27,7 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { CRUMENA_ABI, CRUMENA_BYTECODE } from "../../shared/crumena-abi";
-import { createCrumena, explain, type Crumena, type Pot } from "../src/lib/crumena";
+import { NO_RULES, createCrumena, explain, type Crumena, type Pot } from "../src/lib/crumena";
 import { toQor } from "../src/lib/format";
 import type { Me, Qorex } from "../src/lib/qorex";
 
@@ -172,6 +172,7 @@ describe.skipIf(!ready)("the app against the real contract (local chain)", () =>
       token,
       endsAt,
       confirmedOnly: false,
+      rules: { maxPerPayment: 50n * FUSD, periodLimit: 0n, periodDays: 0 },
       purpose: "Office fit-out, phase 1",
       payees: [shopAcct.address],
       names: ["Halden Building Supplies"],
@@ -228,12 +229,27 @@ describe.skipIf(!ready)("the app against the real contract (local chain)", () =>
     await expect(app.addPayee(fakeQorex(spenderAcct, seen), meOf(spenderAcct), pot, relayerAcct.address, "Nope")).rejects.toThrow(/different account/);
   });
 
+  it("the funder sets a weekly limit and freezes the pot; both are enforced", async () => {
+    await app.setRules(fakeQorex(funderAcct, seen), meOf(funderAcct), pot, { maxPerPayment: 0n, periodLimit: 12n * FUSD, periodDays: 7 });
+    expect(seen.at(-1)).toContain("Limit per period: 12 fUSD every 7 days");
+    await app.pay(fakeQorex(spenderAcct, seen), meOf(spenderAcct), pot, shopAcct.address, 10n * FUSD, "");
+    await expect(app.pay(fakeQorex(spenderAcct, seen), meOf(spenderAcct), pot, shopAcct.address, 3n * FUSD, "")).rejects.toSatisfy(
+      (e) => explain(e) === "That's more than is left to spend in this period.",
+    );
+    expect((await app.periodSpending(pot.id)).spent).toBe(10n * FUSD);
+
+    await app.setFrozen(fakeQorex(funderAcct, seen), meOf(funderAcct), pot, true);
+    expect((await app.pot(pot.id)).frozen).toBe(true);
+    await expect(app.pay(fakeQorex(spenderAcct, seen), meOf(spenderAcct), pot, shopAcct.address, FUSD, "")).rejects.toSatisfy((e) => explain(e).includes("frozen"));
+    await app.setFrozen(fakeQorex(funderAcct, seen), meOf(funderAcct), pot, false);
+  });
+
   it("the funder extends, then releases the rest to the spender", async () => {
     await app.extend(fakeQorex(funderAcct, seen), meOf(funderAcct), pot, pot.endsAt + 86400n);
     expect((await app.pot(pot.id)).endsAt).toBe(pot.endsAt + 86400n);
     const before = await fusdOf(spenderAcct.address);
     await app.release(fakeQorex(funderAcct, seen), meOf(funderAcct), pot);
-    expect((await fusdOf(spenderAcct.address)) - before).toBe(64_500_000n);
+    expect((await fusdOf(spenderAcct.address)) - before).toBe(54_500_000n);
     expect((await app.pot(pot.id)).closed).toBe(true);
   });
 
@@ -244,6 +260,7 @@ describe.skipIf(!ready)("the app against the real contract (local chain)", () =>
       token,
       endsAt: (await chainNow()) + 3600n,
       confirmedOnly: true,
+      rules: NO_RULES,
       purpose: "Short pot",
       payees: [shopAcct.address],
       names: ["Halden Building Supplies"],

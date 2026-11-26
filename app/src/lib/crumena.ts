@@ -7,7 +7,7 @@
  *   3. the signer approves that text in QoreX, which signs it with ML-DSA-87;
  *   4. hand the call to the relayer, which can only submit it: it can't change a byte without breaking the signature.
  */
-import { createPublicClient, encodeFunctionData, http, type Address, type Hex } from "viem";
+import { createPublicClient, encodeFunctionData, erc20Abi, http, type Address, type Hex } from "viem";
 import { CRUMENA_ABI } from "../../../shared/crumena-abi";
 import { explainError } from "../../../shared/errors";
 import { toQor, units, utc } from "./format";
@@ -32,11 +32,24 @@ export interface Pot {
   decimals: number;
   confirmedOnly: boolean;
   closed: boolean;
+  frozen: boolean;
+  periodDays: number;
+  periodIndex: bigint;
   paidOut: bigint;
+  maxPerPayment: bigint;
+  periodLimit: bigint;
+  spentInPeriod: bigint;
   symbol: string;
   purpose: string;
   balance: bigint;
 }
+/** Spending rules; zero means no rule. A period limit needs a period length in days. */
+export interface Rules {
+  maxPerPayment: bigint;
+  periodLimit: bigint;
+  periodDays: number;
+}
+export const NO_RULES: Rules = { maxPerPayment: 0n, periodLimit: 0n, periodDays: 0 };
 export interface Payee {
   address: Address;
   approved: boolean;
@@ -50,6 +63,7 @@ export interface NewPot {
   token: Address;
   endsAt: bigint;
   confirmedOnly: boolean;
+  rules: Rules;
   purpose: string;
   payees: Address[];
   names: string[];
@@ -99,6 +113,20 @@ export function createCrumena(config: Config, opts: { base?: string; fetch?: typ
   async function payees(id: bigint): Promise<Payee[]> {
     const [addrs, info] = await read<[Address[], Omit<Payee, "address">[]]>("payeesOf", [id]);
     return addrs.map((a, i) => ({ address: a, ...info[i]! }));
+  }
+
+  /** Spending in the current period (all zero for a pot without a period limit). */
+  async function periodSpending(id: bigint): Promise<{ spent: bigint; limit: bigint; resetsAt: bigint }> {
+    const [spent, limit, resetsAt] = await read<[bigint, bigint, bigint]>("periodSpending", [id]);
+    return { spent, limit, resetsAt };
+  }
+
+  async function tokenInfo(token: Address): Promise<{ decimals: number; symbol: string }> {
+    const [decimals, symbol] = await Promise.all([
+      client.readContract({ address: token, abi: erc20Abi, functionName: "decimals" }),
+      client.readContract({ address: token, abi: erc20Abi, functionName: "symbol" }),
+    ]);
+    return { decimals, symbol };
   }
 
   /** Every pot an account funds, spends, or is a payee of, newest first. */
@@ -154,18 +182,23 @@ export function createCrumena(config: Config, opts: { base?: string; fetch?: typ
     pot,
     payees,
     potsOf,
+    periodSpending,
+    tokenInfo,
     nonceOf: (a: Address) => read<bigint>("nonceOf", [a]),
     vaultFor: (funder: Address, nonce: bigint) => read<Address>("vaultFor", [funder, nonce]),
 
-    createPot: (q: Qorex, me: Me, p: NewPot) =>
-      signed(q, me, p.funder, "createStatement", (n, v) => [p, n, v], "createPot", (a) => [p, a], [
+    createPot: async (q: Qorex, me: Me, p: NewPot) => {
+      const t = await tokenInfo(p.token);
+      return signed(q, me, p.funder, "createStatement", (n, v) => [p, n, v], "createPot", (a) => [p, a], [
         "Crumena: create a pot",
         `Purpose: ${p.purpose}`,
         `Spent by: ${toQor(p.recipient)}`,
         `Ends: ${utc(p.endsAt)}`,
         `Pay only payees who confirmed: ${p.confirmedOnly ? "yes" : "no"}`,
+        ...rulesLines(p.rules, t.decimals, t.symbol),
         ...p.payees.map((x, i) => `${i + 1}. ${p.names[i]}, ${x.toLowerCase()}`),
-      ]),
+      ]);
+    },
 
     pay: (q: Qorex, me: Me, p: Pot, payee: Address, amount: bigint, memo: string) =>
       signed(q, me, me.evm, "payStatement", (n, v) => [p.id, payee, amount, memo, me.evm, n, v], "pay", (a) => [p.id, payee, amount, memo, me.evm, a], [
@@ -207,6 +240,19 @@ export function createCrumena(config: Config, opts: { base?: string; fetch?: typ
         `New end: ${utc(newEndsAt)}`,
       ]),
 
+    setRules: (q: Qorex, me: Me, p: Pot, r: Rules) =>
+      signed(q, me, p.funder, "rulesStatement", (n, v) => [p.id, r, n, v], "setRules", (a) => [p.id, r, a], [
+        `Crumena: change the spending rules of pot #${p.id}`,
+        ...rulesLines(r, p.decimals, p.symbol),
+      ]),
+
+    setFrozen: (q: Qorex, me: Me, p: Pot, frozen: boolean) =>
+      signed(q, me, p.funder, "frozenStatement", (n, v) => [p.id, frozen, n, v], "setFrozen", (a) => [p.id, frozen, a], [
+        frozen
+          ? `Crumena: freeze pot #${p.id} (no payments until the funder unfreezes it)`
+          : `Crumena: unfreeze pot #${p.id} (payments allowed again)`,
+      ]),
+
     release: (q: Qorex, me: Me, p: Pot) =>
       signed(q, me, p.funder, "releaseStatement", (n, v) => [p.id, n, v], "release", (a) => [p.id, a], [
         `Crumena: give everything left in pot #${p.id} to the person who spends it, with no restrictions, and close the pot`,
@@ -219,6 +265,14 @@ export function createCrumena(config: Config, opts: { base?: string; fetch?: typ
 }
 
 export type Crumena = ReturnType<typeof createCrumena>;
+
+/** The two rules lines exactly as the contract writes them. */
+export function rulesLines(r: Rules, decimals: number, symbol: string): [string, string] {
+  const perPayment = r.maxPerPayment === 0n ? "none" : `${units(r.maxPerPayment, decimals)} ${symbol}`;
+  const perPeriod =
+    r.periodLimit === 0n ? "none" : `${units(r.periodLimit, decimals)} ${symbol} every ${r.periodDays} ${r.periodDays === 1 ? "day" : "days"}`;
+  return [`Limit per payment: ${perPayment}`, `Limit per period: ${perPeriod}`];
+}
 
 /**
  * Throws unless the statement's first line is the expected action and every expected line appears exactly.

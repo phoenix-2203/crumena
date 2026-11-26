@@ -93,7 +93,18 @@ export async function loadConfig(base = "", f: typeof fetch = fetch): Promise<Co
   return (await r.json()) as Config;
 }
 
-export function createCrumena(config: Config, opts: { base?: string; fetch?: typeof fetch; now?: () => number } = {}) {
+export interface Options {
+  base?: string;
+  fetch?: typeof fetch;
+  now?: () => number;
+  /**
+   * Called with the exact text just before it goes to QoreX (after the line check), so the app can show it.
+   * Return false to stop there.
+   */
+  onStatement?: (statement: string, fn: string) => Promise<boolean> | boolean;
+}
+
+export function createCrumena(config: Config, opts: Options = {}) {
   const base = opts.base ?? (typeof location === "undefined" ? "" : location.origin);
   const f = opts.fetch ?? fetch;
   const now = opts.now ?? Date.now;
@@ -169,6 +180,7 @@ export function createCrumena(config: Config, opts: { base?: string; fetch?: typ
       `Valid until: ${utc(validUntil)}`,
       `Contract: ${address.toLowerCase()} on ${config.chainId}`,
     ]);
+    if (opts.onStatement && !(await opts.onStatement(statement, fn))) throw new ActionError("Cancelled. Nothing was signed.");
     const signature = await signStatement(q, me, statement);
     const data = encodeFunctionData({ abi: CRUMENA_ABI, functionName: fn as never, args: callArgs({ nonce, validUntil, signature }) as never });
     return relay(data);
@@ -178,6 +190,7 @@ export function createCrumena(config: Config, opts: { base?: string; fetch?: typ
 
   return {
     config,
+    client,
     read,
     pot,
     payees,

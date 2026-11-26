@@ -1,7 +1,7 @@
 // WCAG 2.1 AA check (axe-core) of each page, light and dark, on the local chain (e2e/local-chain.ts running): node e2e/a11y.cjs
 const { chromium } = require("playwright") /* pre-installed */;
 const fs = require("fs");
-const axe = fs.readFileSync("require.resolve("axe-core/axe.min.js")", "utf8");
+const axe = fs.readFileSync(require.resolve("axe-core/axe.min.js"), "utf8");
 (async () => {
   const b = await chromium.launch();
   for (const scheme of ["light", "dark"]) {

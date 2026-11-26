@@ -61,12 +61,19 @@ export async function verifyAction(c: Crumena, hash: Hex): Promise<Verification>
       break;
     case "addPayee":
     case "requestPayee": {
-      auth = a[3] as Auth;
+      // (potId, payee, name, limit or amount, auth)
+      auth = a[4] as Auth;
       const pot = await potOf(a[0] as bigint);
       signer = fn === "addPayee" ? pot.funder : pot.recipient;
-      [statementFn, statementArgs] = [`${fn}Statement`, [a[0], a[1], a[2], auth.nonce, auth.validUntil]];
+      [statementFn, statementArgs] = [`${fn}Statement`, [a[0], a[1], a[2], a[3], auth.nonce, auth.validUntil]];
       break;
     }
+    case "setPayeeLimit":
+      // (potId, payee, limit, auth)
+      auth = a[3] as Auth;
+      signer = (await potOf(a[0] as bigint)).funder;
+      [statementFn, statementArgs] = ["payeeLimitStatement", [a[0], a[1], a[2], auth.nonce, auth.validUntil]];
+      break;
     case "removePayee":
       auth = a[2] as Auth;
       signer = (await potOf(a[0] as bigint)).funder;

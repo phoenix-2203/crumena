@@ -337,6 +337,17 @@ describe.skipIf(!ready)("the app against the real contract (local chain)", () =>
     expect(ok.statement).toContain("Limit per period: 20 fUSD every 7 days");
     expect(ok.keyFingerprint).toMatch(/^[0-9a-f]{16}$/);
 
+    // The changed actions verify too: approving a payee with a limit, and changing that limit.
+    const pot2 = await app.pot(BigInt(created.potId!));
+    const approved = await app.addPayee(signer, meOf(funderAcct), pot2, otherAcct.address, "Brightline Electrical", 12n * FUSD);
+    const v1 = await verifyAction(app, approved.hash);
+    expect(v1).toMatchObject({ fn: "addPayee", valid: true });
+    expect(v1.statement).toContain("Up to: 12 fUSD in total");
+    const limited = await app.setPayeeLimit(signer, meOf(funderAcct), pot2, otherAcct.address, 20n * FUSD);
+    const v2 = await verifyAction(app, limited.hash);
+    expect(v2).toMatchObject({ fn: "setPayeeLimit", valid: true });
+    expect(v2.statement).toContain("Up to: 20 fUSD in total");
+
     // A transaction signed with a different key than the one on record fails the browser's check.
     const fresh = await app.pot(BigInt(created.potId!));
     const other = pqKeyFromSeed(new Uint8Array(32).fill(7));

@@ -164,15 +164,27 @@ record("The spender pays the new shop 10 fUSD", (await fusdOf(shopB.evm)) === 10
 // a. With only the funder's classical key, the chain won't open an EVM window.
 const classicalOnly = new EthNativeSigner(funder.unified, { signMode: "classical", rest: REST });
 const acct = await rest<{ account: { account_number: string; sequence: string } }>(`/cosmos/auth/v1beta1/accounts/${funder.qor}`);
-const winTry = (await classicalOnly.signAndBroadcast(transport, {
-  chainId: CHAIN_ID,
-  accountNumber: BigInt(acct.account.account_number),
-  sequence: BigInt(acct.account.sequence),
-  fee: NATIVE_FEE,
-  messages: [openEvmWindowMsg({ sender: funder.qor, blocks: 100, maxTxs: 1, maxValue: "1000000", allowedTargets: [CRUMENA] })] as never,
-  memo: "crumena drill: window with the classical key only",
-})) as { code: number; transactionHash: string; rawLog?: string };
-record("Attack: open an EVM window with the funder's stolen classical key only", winTry.code !== 0, `refused by the chain (code ${winTry.code}): ${(winTry.rawLog ?? "").slice(0, 160)}`, winTry.transactionHash);
+// The chain refuses it before inclusion; the SDK reports that as a thrown error rather than a result with a code.
+let winTry: { code: number; transactionHash?: string; rawLog?: string };
+try {
+  winTry = (await classicalOnly.signAndBroadcast(transport, {
+    chainId: CHAIN_ID,
+    accountNumber: BigInt(acct.account.account_number),
+    sequence: BigInt(acct.account.sequence),
+    fee: NATIVE_FEE,
+    messages: [openEvmWindowMsg({ sender: funder.qor, blocks: 100, maxTxs: 1, maxValue: "1000000", allowedTargets: [CRUMENA] })] as never,
+    memo: "crumena drill: window with the classical key only",
+  })) as { code: number; transactionHash: string; rawLog?: string };
+} catch (e) {
+  const msg = (e as Error).message;
+  winTry = { code: -1, rawLog: msg, transactionHash: /\(tx ([0-9A-F]{64})\)/.exec(msg)?.[1] };
+}
+const refusedForPq = winTry.code !== 0 && /hybrid PQC signature required/i.test(winTry.rawLog ?? "");
+record(
+  "Attack: open an EVM window with the funder's stolen classical key only",
+  refusedForPq,
+  `refused by the chain: ${/account \S+ has a registered PQC key[\s\S]*?hybrid PQC signature required/.exec(winTry.rawLog ?? "")?.[0] ?? (winTry.rawLog ?? "").slice(0, 200)}`,
+);
 
 // b. Even inside a window the funder opened, the classical key can't add a payee.
 await funder.openWindow([CRUMENA], 1, 1_500_000n, 100);

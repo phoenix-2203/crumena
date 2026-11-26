@@ -236,7 +236,7 @@ function SpenderActions({ pot, payees, onDone }: { pot: Pot; payees: Payee[]; on
             </label>
             <label className="field">
               Note <span className="hint">Optional, e.g. an invoice number. Goes in the signed text.</span>
-              <input value={memo} maxLength={80} onChange={(e) => setMemo(e.target.value)} placeholder="Invoice 1042" />
+              <input value={memo} maxLength={80} onChange={(e) => setMemo(e.target.value)} placeholder="Invoice number" />
             </label>
             <ActionButton
               kind="primary"
@@ -260,7 +260,7 @@ function SpenderActions({ pot, payees, onDone }: { pot: Pot; payees: Payee[]; on
         </p>
         <label className="field">
           Name
-          <input value={reqName} maxLength={48} onChange={(e) => setReqName(e.target.value)} placeholder="Brightline Electrical" />
+          <input value={reqName} maxLength={48} onChange={(e) => setReqName(e.target.value)} placeholder="Vendor name" />
         </label>
         <label className="field">
           Address

@@ -26,17 +26,17 @@ export function Demo() {
       <h1>Try Crumena in two minutes</h1>
       <p className="lead">
         You'll get three test people on QoreChain testnet, each with a real post-quantum (ML-DSA-87) key registered on chain: a <strong>funder</strong>, a{" "}
-        <strong>spender</strong> and a <strong>shop</strong>. Switch between them at the top of the page.
+        <strong>spender</strong> and a <strong>vendor</strong>. Switch between them at the top of the page.
       </p>
       <ol className="stack">
         <li>
           <strong>As the funder,</strong> create a pot (we fill in the details), sign it, and add 50 test fUSD.
         </li>
         <li>
-          <strong>As the spender,</strong> pay the shop. Then try paying more than the cap: the contract refuses.
+          <strong>As the spender,</strong> pay the vendor. Then try paying more than the cap: the contract refuses.
         </li>
         <li>
-          <strong>As the shop,</strong> confirm the address is yours, with your own key.
+          <strong>As the vendor,</strong> confirm the address is yours, with your own key.
         </li>
         <li>
           <strong>As the funder again,</strong> freeze the pot, or give the rest to the spender. Press <em>Verify</em> on any payment to check its signature
@@ -54,7 +54,7 @@ export function Demo() {
             <tbody>
               {demo.map((p) => (
                 <tr key={p.role}>
-                  <td style={{ textTransform: "capitalize" }}>{p.role}</td>
+                  <td style={{ textTransform: "capitalize" }}>{p.role === "shop" ? "vendor" : p.role}</td>
                   <td>
                     <Address value={p.evm} qor />
                   </td>

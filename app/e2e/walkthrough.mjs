@@ -38,7 +38,7 @@ await shot("04-pot-funder");
 
 await as("Spender");
 await page.getByLabel(/Amount \(fUSD\)/).fill("12.5");
-await page.getByLabel(/Note/).fill("Spring term deposit");
+await page.getByLabel(/Note/).fill("Invoice 1042");
 await page.getByRole("button", { name: "Review and sign" }).first().click();
 await sign();
 console.log("pay:", await toast());
@@ -49,7 +49,7 @@ console.log("over cap:", await toast());
 await page.waitForTimeout(500);
 await shot("05-pot-spender");
 
-await as("Shop");
+await as("Vendor");
 await page.getByRole("button", { name: /^Confirm as/ }).click();
 await sign();
 console.log("confirm:", await toast());

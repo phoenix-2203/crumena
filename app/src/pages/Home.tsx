@@ -5,10 +5,10 @@ import { go, useApp } from "../state";
 import { EXPLORER, ExplorerLink } from "../ui";
 
 const USES = [
-  ["School fees", "A parent abroad fills a pot. Only the school's account can be paid. What's left comes back after term."],
-  ["Site materials", "A company gives a site manager a budget that pays the approved suppliers, capped at 500 per order."],
-  ["Allowances", "20 a week for a student, spendable at the canteen and the bookshop, nowhere else."],
-  ["Grants", "A funder approves the equipment vendors up front; the team buys what it needs, with a record of every payment."],
+  ["Budgets", "Give someone a budget that can only pay the vendors you approve, capped per payment."],
+  ["Allowances", "A fixed amount each week or month, spendable only where you allow, nowhere else."],
+  ["Grants", "Approve the vendors up front; the recipient buys what's needed, with a record of every payment."],
+  ["Group funds", "Several people pay into one pot; it can only pay out for the purpose everyone agreed."],
 ];
 
 export function Home() {
@@ -37,7 +37,7 @@ export function Home() {
           )}
         </div>
         <p className="muted small" style={{ marginTop: 10 }}>
-          The demo gives you three test people (a funder, a spender and a shop) with real post-quantum keys on QoreChain testnet. No wallet, no sign-up.
+          The demo gives you three test people (a funder, a spender and a vendor) with real post-quantum keys on QoreChain testnet. No wallet, no sign-up.
         </p>
       </section>
 
@@ -74,7 +74,7 @@ export function Home() {
         <h2>Why it holds up, even against a quantum computer</h2>
         <ul>
           <li>
-            Every action is a readable statement ("pay 25 fUSD to Halden Building Supplies…") signed in QoreX with <strong>ML-DSA-87</strong>, the post-quantum
+            Every action is a readable statement ("pay 25 fUSD to Approved vendor…") signed in QoreX with <strong>ML-DSA-87</strong>, the post-quantum
             signature standard. The contract rebuilds the text and checks it with QoreChain's <span className="mono">pqcVerify</span> precompile, against the key
             the chain has on record for that person.
           </li>

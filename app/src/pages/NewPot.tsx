@@ -30,10 +30,10 @@ function Form() {
   const { crumena, signer, demo, toast } = useApp();
   const spenderDemo = demo?.find((p) => p.role === "spender");
   const shopDemo = demo?.find((p) => p.role === "shop");
-  const [purpose, setPurpose] = useState(demo ? "School fees, spring term" : "");
+  const [purpose, setPurpose] = useState(demo ? "Monthly budget" : "");
   const [spender, setSpender] = useState(spenderDemo?.qor ?? "");
   const [payees, setPayees] = useState<{ name: string; address: string }[]>(
-    shopDemo ? [{ name: "Greenfield School", address: shopDemo.qor }] : [{ name: "", address: "" }],
+    shopDemo ? [{ name: "Approved vendor", address: shopDemo.qor }] : [{ name: "", address: "" }],
   );
   const [days, setDays] = useState(30);
   const [cap, setCap] = useState(demo ? "20" : "");
@@ -128,7 +128,7 @@ function Form() {
         <label className="field">
           What is it for?
           <span className="hint">Shown in every statement anyone signs for this pot.</span>
-          <input value={purpose} maxLength={80} onChange={(e) => setPurpose(e.target.value)} placeholder="Site materials, phase 1" />
+          <input value={purpose} maxLength={80} onChange={(e) => setPurpose(e.target.value)} placeholder="Monthly budget" />
           {errors.purpose && <div className="error">{errors.purpose}</div>}
         </label>
         <label className="field">
@@ -145,7 +145,7 @@ function Form() {
           <div className="grid cols-2" key={i}>
             <label className="field">
               Name
-              <input value={p.name} maxLength={48} onChange={(e) => setPayees(payees.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} placeholder="Halden Building Supplies" />
+              <input value={p.name} maxLength={48} onChange={(e) => setPayees(payees.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} placeholder="Vendor name" />
               {errors[`name${i}`] && <div className="error">{errors[`name${i}`]}</div>}
             </label>
             <label className="field">

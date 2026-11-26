@@ -324,3 +324,11 @@ footer.site a:hover { color: var(--ink); }
 .cta { margin-top: 110px; text-align: center; padding: 72px 24px; border: 1px solid var(--line); border-radius: 28px; background: radial-gradient(60% 90% at 50% 0%, var(--surface), transparent 75%), var(--surface-2); }
 .cta h2 { font-size: clamp(2rem, 4.4vw, 3.4rem); }
 .cta-mark { width: 44px; height: 44px; fill: var(--mark); margin-bottom: 18px; }
+
+/* ---------- demo ---------- */
+.demo-grid { display: grid; grid-template-columns: 1fr 460px; gap: 48px; align-items: start; margin-top: 28px; }
+.demo-grid .card { position: sticky; top: 96px; }
+.people { list-style: none; margin: 0; padding: 0; }
+.people li { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+.people li:first-child { border-top: 0; }
+@media (max-width: 960px) { .demo-grid { grid-template-columns: 1fr; gap: 12px; } .demo-grid .card { position: static; } }

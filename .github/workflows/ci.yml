@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+
+      - name: Contracts build
+        working-directory: contracts
+        run: forge build --sizes
+
+      - name: Contracts tests (unit, fuzz, invariants)
+        working-directory: contracts
+        run: forge test -vv
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: The committed ABI matches the contract
+        run: node scripts/gen-abi.mjs && git diff --exit-code shared/crumena-abi.ts
+
+      - run: pnpm -r typecheck
+
+      - name: Server and app tests (the app's flow runs against the contract on anvil)
+        run: pnpm -r test
+
+      - name: App builds
+        run: pnpm --filter @crumena/app build

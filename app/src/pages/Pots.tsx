@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { explain, type Pot } from "../lib/crumena";
+import { units } from "../lib/format";
 import { useApp } from "../state";
 import { NeedsSigner, money, potStatus, when } from "../ui";
 
@@ -33,38 +34,56 @@ function PotList() {
   const role = (p: Pot) => (p.funder.toLowerCase() === me ? "You fund it" : p.recipient.toLowerCase() === me ? "You spend it" : "");
 
   return (
-    <div className="stack">
-      <div className="row between">
-        <h1 style={{ margin: 0 }}>Pots</h1>
+    <div>
+      <div className="page-head row between" style={{ alignItems: "flex-end" }}>
+        <div>
+          <span className="label">Acting as {signer!.label}</span>
+          <h1 style={{ margin: "14px 0 0" }}>Pots</h1>
+        </div>
         <a className="btn primary" href="#/new">
-          New pot
+          New pot <span className="arrow" aria-hidden>→</span>
         </a>
       </div>
-      <p className="muted">Acting as {signer!.label}.</p>
       {error && <p className="error">{error}</p>}
-      {!pots && !error && <p className="muted">Loading…</p>}
-      {pots?.length === 0 && (
-        <div className="card">
-          <p style={{ margin: 0 }}>
-            No pots yet. <a href="#/new">Create one</a>. If someone pays you from a pot, open the link they sent you.
-          </p>
+      {!pots && !error && (
+        <div className="pot-grid" aria-busy="true">
+          {[0, 1].map((i) => (
+            <div key={i} className="card skeleton" />
+          ))}
         </div>
       )}
-      <div className="grid cols-2">
+      {pots?.length === 0 && (
+        <div className="card empty">
+          <h2>No pots yet</h2>
+          <p className="muted">Create one, or if someone pays you from a pot, open the link they sent you.</p>
+          <a className="btn primary" href="#/new">
+            Create a pot
+          </a>
+        </div>
+      )}
+      <div className="pot-grid">
         {pots?.map((p) => {
           const s = potStatus(p);
+          const total = p.balance + p.paidOut;
+          const pct = total > 0n ? Number((p.paidOut * 100n) / total) : 0;
           return (
-            <a key={p.id.toString()} href={`#/pot/${p.id}`} className="card stack" style={{ textDecoration: "none", color: "inherit" }}>
-              <div className="row between">
-                <span className="muted small">Pot #{p.id.toString()}</span>
+            <a key={p.id.toString()} href={`#/pot/${p.id}`} className="card pot-card">
+              <div className="card-head" style={{ marginBottom: 0 }}>
+                <span className="label">Pot #{p.id.toString()}</span>
                 <span className={`pill ${s.tone}`}>{s.label}</span>
               </div>
-              <h3 style={{ margin: 0 }}>{p.purpose}</h3>
-              <div className="big">{money(p.balance, p)}</div>
-              <div className="row small muted">
-                <span>{role(p)}</span>
-                <span>Ends {when(p.endsAt)}</span>
+              <h3>{p.purpose}</h3>
+              <div className="pot-amt">
+                <span className="num">{units(p.balance, p.decimals)}</span>
+                <span className="muted small">{p.symbol} left</span>
+              </div>
+              <div className="bar" aria-hidden>
+                <div style={{ width: `${pct}%` }} />
+              </div>
+              <div className="ev-meta" style={{ marginTop: 12 }}>
+                {role(p) && <span>{role(p)}</span>}
                 <span>Paid out {money(p.paidOut, p)}</span>
+                <span>Ends {when(p.endsAt)}</span>
               </div>
             </a>
           );

@@ -5,12 +5,8 @@ import { QOREX_INSTALL_URL } from "../lib/qorex";
 import { go, useApp } from "../state";
 import { EXPLORER, ExplorerLink, Mark } from "../ui";
 import { Challenge } from "./Challenge";
+import { HowItWorks } from "./HowItWorks";
 
-const STEPS = [
-  ["Fill a pot", "Say what it's for, who spends it, who can be paid and how much, and the limits. Then pay into the pot's own address."],
-  ["They spend it, within your rules", "The spender pays approved payees only, up to the amounts and caps you set. No gas and no crypto knowledge: they read a sentence and sign it."],
-  ["The rest comes back", "After the end date, whatever is left returns to you. Anyone can trigger it, and it can only go to you."],
-] as const;
 
 const ROLES = [
   {
@@ -138,21 +134,7 @@ export function Home() {
 
       <Challenge />
 
-      <section id="how" className="section">
-        <div className="section-head">
-          <span className="label">How it works</span>
-          <h2>Three steps. One purpose.</h2>
-        </div>
-        <ol className="steps">
-          {STEPS.map(([t, d], i) => (
-            <li key={t}>
-              <span className="step-n">0{i + 1}</span>
-              <h3>{t}</h3>
-              <p className="muted">{d}</p>
-            </li>
-          ))}
-        </ol>
-      </section>
+      <HowItWorks />
 
       <section id="roles" className="section">
         <div className="section-head">

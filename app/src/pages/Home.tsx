@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { PROOF } from "../proof";
 import { explain } from "../lib/crumena";
 import { short } from "../lib/format";
@@ -100,6 +101,7 @@ export function Home() {
               </button>
             )}
           </div>
+          <LiveLine />
           <ul className="trust" aria-label="What every action has">
             <li>ML-DSA-87 signed</li>
             <li>pqcVerify on chain</li>
@@ -314,6 +316,31 @@ export function Home() {
         </p>
       </section>
     </>
+  );
+}
+
+/** The chain, right now: the latest testnet block, read on this visit. */
+function LiveLine() {
+  const { crumena } = useApp();
+  const [block, setBlock] = useState<bigint>();
+  useEffect(() => {
+    if (!crumena) return;
+    let live = true;
+    const read = () => crumena.client.getBlockNumber({ cacheTime: 0 }).then((b) => live && setBlock(b), () => undefined);
+    read();
+    const t = setInterval(read, 6000);
+    return () => {
+      live = false;
+      clearInterval(t);
+    };
+  }, [crumena]);
+  if (block === undefined) return null;
+  return (
+    <p className="live-line" aria-live="off">
+      <span className="live-tag">Live</span>
+      <span>QoreChain testnet block {block.toLocaleString()}</span>
+      <span>Contract {short(crumena!.config.crumena)}</span>
+    </p>
   );
 }
 

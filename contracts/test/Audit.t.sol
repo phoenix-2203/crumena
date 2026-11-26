@@ -34,7 +34,38 @@ contract NoReturnToken {
     }
 }
 
-/// @notice One regression test (or more) for each finding of the QCAI audit, Stage 1 (docs/AUDIT.md).
+/// @notice A 6-decimal token that, during a transfer, tries to call back into Crumena with whatever
+///         call it was given (to test re-entry), and records how that call ended.
+contract ReentrantToken {
+    string public constant symbol = "fUSD";
+    uint8 public constant decimals = 6;
+    mapping(address => uint256) public balanceOf;
+    address public target;
+    bytes public callback;
+    bool public tried;
+    bytes public outcome;
+
+    function mint(address to, uint256 v) external {
+        balanceOf[to] += v;
+    }
+
+    function arm(address target_, bytes calldata callback_) external {
+        target = target_;
+        callback = callback_;
+    }
+
+    function transfer(address to, uint256 v) external returns (bool) {
+        balanceOf[msg.sender] -= v;
+        balanceOf[to] += v;
+        if (target != address(0) && !tried) {
+            tried = true;
+            (, outcome) = target.call(callback);
+        }
+        return true;
+    }
+}
+
+/// @notice One regression test (or more) for each finding of the QCAI audit, Stages 1 and 2 (docs/AUDIT.md).
 contract AuditTest is Base {
     // ------------------------------------------------------------------ QCAI-1
     // "Potential privilege escalation via incorrect nonce management" (HIGH)
@@ -226,5 +257,82 @@ contract AuditTest is Base {
         vm.prank(relayer);
         vm.expectRevert(abi.encodeWithSelector(Crumena.BadNonce.selector, nonce + 1, nonce));
         crumena.pay(potId, supplierA, 4 * FUSD, "", recipient, a);
+    }
+
+    // ------------------------------------------------------- Stage 2, S2-1
+    // "Missing access control on PotVault.send()" (HIGH)
+
+    function test_s2_1_anotherCrumenaCantMoveThisCrumenasVault() public {
+        uint256 potId = _fundedPot(10 * FUSD);
+        PotVault v = PotVault(crumena.potInfo(potId).vault);
+        assertEq(v.crumena(), address(crumena));
+        Crumena other = new Crumena("qorechain-diana", DIANA);
+        vm.prank(address(other));
+        vm.expectRevert(PotVault.NotCrumena.selector);
+        v.send(address(token), address(other), 10 * FUSD);
+    }
+
+    // ------------------------------------------------------- Stage 2, S2-3
+    // "Reentrancy risk in PotVault.send() via external call" (MEDIUM)
+
+    function _reentrantPot(ReentrantToken t) internal returns (uint256 potId) {
+        Crumena.NewPot memory p = _newPot();
+        p.token = address(t);
+        potId = _createSigned(p);
+        t.mint(crumena.potInfo(potId).vault, 100 * FUSD);
+    }
+
+    function test_s2_3_reEnteringWithTheSameSignedPaymentFindsItsNonceUsed() public {
+        ReentrantToken t = new ReentrantToken();
+        uint256 potId = _reentrantPot(t);
+        uint256 nonce = crumena.nonceOf(recipient);
+        string memory st = crumena.payStatement(potId, supplierA, 10 * FUSD, "", recipient, nonce, _validUntil());
+        Crumena.Auth memory a = Crumena.Auth(nonce, _validUntil(), _sig(recipient, st));
+        t.arm(address(crumena), abi.encodeCall(Crumena.pay, (potId, supplierA, 10 * FUSD, "", recipient, a)));
+
+        crumena.pay(potId, supplierA, 10 * FUSD, "", recipient, a);
+        assertTrue(t.tried());
+        assertEq(t.outcome(), abi.encodeWithSelector(Crumena.BadNonce.selector, nonce + 1, nonce), "the nonce moved before the transfer");
+        assertEq(t.balanceOf(supplierA), 10 * FUSD, "paid once");
+        assertEq(crumena.potInfo(potId).paidOut, 10 * FUSD);
+    }
+
+    function test_s2_3_reEnteringReclaimOnlyEverPaysTheFunder() public {
+        ReentrantToken t = new ReentrantToken();
+        uint256 potId = _reentrantPot(t);
+        t.arm(address(crumena), abi.encodeCall(Crumena.reclaim, (potId)));
+        vm.warp(crumena.potInfo(potId).endsAt + 1);
+        crumena.reclaim(potId);
+        assertTrue(t.tried());
+        assertEq(t.balanceOf(funder), 100 * FUSD, "everything went to the funder, once");
+        assertEq(t.balanceOf(crumena.potInfo(potId).vault), 0);
+        assertTrue(crumena.potInfo(potId).closed);
+    }
+
+    // ------------------------------------------------------- Stage 2, S2-4
+    // "Unbounded loop in _checkNewPot()" (LOW)
+
+    function test_s2_4_theDuplicateCheckIsBoundedByTenPayees() public {
+        Crumena.NewPot memory p = _newPot();
+        p.payees = new address[](11);
+        p.names = new string[](11);
+        for (uint256 i; i < 11; ++i) {
+            p.payees[i] = address(uint160(0xC000 + i));
+            p.names[i] = "Shop";
+        }
+        _expectCreateRevert(p, abi.encodeWithSelector(Crumena.TooManyPayees.selector));
+
+        p.payees = new address[](10);
+        p.names = new string[](10);
+        for (uint256 i; i < 10; ++i) {
+            p.payees[i] = address(uint160(0xC000 + i));
+            p.names[i] = "Shop";
+        }
+        Crumena.Auth memory a = _createAuth(p);
+        uint256 gasBefore = gasleft();
+        crumena.createPot(p, a);
+        uint256 used = gasBefore - gasleft();
+        emit log_named_uint("createPot with ten payees, gas", used);
+        assertLt(used, 3_000_000, "fits the relayer's per-call gas cap");
     }
 }

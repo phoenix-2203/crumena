@@ -5,13 +5,13 @@ The Post-Quantum dApp track asks for a two-stage audit with QoreChain's AI audit
 | Stage | Date | Report | Score | Findings |
 |---|---|---|---|---|
 | Stage 1 | 2026-11-26 | [`audit/stage1-2026-11-26.pdf`](audit/stage1-2026-11-26.pdf) | 82/100 (risk: medium) | 1 high, 2 medium, 1 low, 1 info |
-| Stage 2 | *pending* | | | |
+| Stage 2 | 2026-11-26 | [`audit/stage2-2026-11-26.pdf`](audit/stage2-2026-11-26.pdf) | 82/100 (risk: medium) | 1 high, 2 medium, 1 low, 1 info |
 
 **Audited code.** One file, [`audit/Crumena.audit.sol`](audit/Crumena.audit.sol): the contract's four sources (`lib/Text.sol`, `lib/Pqc.sol`, `PotVault.sol`, `Crumena.sol`) joined without changes, only their import, pragma and licence lines dropped. It is the code deployed at `0xD98320A95030874498b92e9cf66f95F83dDe47af` ([`TESTNET_RUN.md`](TESTNET_RUN.md)). QCAI's line numbers don't point at the lines it describes in that file (line 658 is inside `addPayeeStatement`, for example), so findings are matched to the code by what they describe.
 
 ## Stage 1 findings and what we did
 
-All five were worked through. None needed a change to the contract: each describes something the contract already prevents. Each now has regression tests in [`contracts/test/Audit.t.sol`](../contracts/test/Audit.t.sol) (14 tests, all passing), so the source and the live deployment stay as they are.
+All five were worked through. None needed a change to the contract: each describes something the contract already prevents. Each now has regression tests in [`contracts/test/Audit.t.sol`](../contracts/test/Audit.t.sol) (18 tests for both stages, all passing), so the source and the live deployment stay as they are.
 
 | # | QCAI finding | Severity | Resolution | Regression tests |
 |---|---|---|---|---|
@@ -49,4 +49,33 @@ The contract already does what QCAI suggests: in every action, the signature is 
 
 ## Stage 2
 
-*To be run on the same file after this response. Results and any differences will be recorded here.*
+Same setting, same file, after Stage 1 was worked through. The contract is unchanged: no Stage 1 finding called for a change (see above), and the live deployment is this exact code. The score is again **82/100**, with five findings. QCAI's AI review isn't deterministic: two findings are Stage 1's again (period overflow; the payee loop, now located in `_checkNewPot`), one Stage 1 finding didn't come back (front-running), and three are worded as new. All five are answered below; the new ones have their own tests.
+
+| # | Stage 2 finding | Severity | Same as | Resolution | Regression tests |
+|---|---|---|---|---|---|
+| S2-1 | Missing access control on `PotVault.send()` | HIGH | new (related to QCAI-3) | **Already in place.** See [S2-1](#s2-1). | `test_s2_1_anotherCrumenaCantMoveThisCrumenasVault`, `test_qcai3_onlyCrumenaMovesAVaultsMoney` |
+| S2-2 | Potential overflow in period calculation | MEDIUM | QCAI-2 | **False positive**, as in [QCAI-2](#qcai-2). | the three `qcai2` tests |
+| S2-3 | Reentrancy risk in `PotVault.send()` via external call | MEDIUM | new | **Not exploitable: every state change happens before the transfer.** See [S2-3](#s2-3). | `test_s2_3_reEnteringWithTheSameSignedPaymentFindsItsNonceUsed`, `test_s2_3_reEnteringReclaimOnlyEverPaysTheFunder` |
+| S2-4 | Unbounded loop in `_checkNewPot()` | LOW | QCAI-4 | **Bounded by ten payees.** See [S2-4](#s2-4). | `test_s2_4_theDuplicateCheckIsBoundedByTenPayees`, `test_rejectsDuplicatePayees` |
+| S2-5 | ERC-20 token interaction | INFO | new | **Already handled.** See [S2-5](#s2-5). | `test_qcai3_*`, `test_rejectsATokenThatIsNotAContract`, `test_rejectsATokenWithAStrangeSymbol` |
+
+### S2-1
+
+`PotVault.send` reverts with `NotCrumena` unless the caller is the vault's own `crumena`, an immutable set to the contract that created it. A vault only ever has one: another Crumena deployment, or anyone else, can't move its money (tested). Inside Crumena, `send` is only reached through `pay`, `release` and `reclaim`, always with the pot's own vault and token taken from storage, after that action's checks.
+
+### S2-3
+
+The suggestion to use `transfer()` applies to sending the chain's native coin; pots hold ERC-20 tokens, and a low-level `call` with the return value checked is the standard safe way to call `transfer` on them. Crumena follows checks-effects-interactions: before any vault transfer, the signer's nonce has moved on, and `paidOut`, the period's spending and `closed` are updated. So a token that calls back into Crumena during a transfer gains nothing:
+- re-entering `pay` with the same signed payment fails with `BadNonce` (tested with a token that tries exactly that);
+- re-entering `reclaim` can only send money to the funder, the one place it may go (tested);
+- everything else needs a fresh signature from the funder, spender or payee.
+
+A pot's token is chosen by its funder; a token that misbehaves can only affect its own balances.
+
+### S2-4
+
+`_checkNewPot` compares the initial payees pairwise to refuse duplicates, but there are at most ten of them (`TooManyPayees` above that), so at most 45 comparisons. A mapping wouldn't be cheaper for ten entries. Creating a pot with ten payees uses about 2.6 million gas in the tests (with the test stand-in for `pqcVerify`, which costs more than the real precompile; a one-payee pot used 997,000 on testnet), within the relayer's 3 million per-call cap.
+
+### S2-5
+
+Every token call is defensive. `decimals()` and `symbol()` are read once, by `staticcall`, with their answers' shapes checked (`BadToken` otherwise, and symbols must be short plain text so statements stay readable); `balanceOf` is a checked `staticcall`; `transfer` accepts the standard `true` and older tokens that return nothing, and reverts on anything else; an address without code can't be a pot's token.

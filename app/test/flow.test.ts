@@ -30,6 +30,9 @@ import { CRUMENA_ABI, CRUMENA_BYTECODE } from "../../shared/crumena-abi";
 import { NO_RULES, createCrumena, explain, type Crumena, type Pot } from "../src/lib/crumena";
 import { toQor } from "../src/lib/format";
 import type { Me, Qorex } from "../src/lib/qorex";
+import { demoSigner } from "../src/lib/demo";
+import { verifyAction } from "../src/lib/verify";
+import { pqKeyFromSeed } from "@qorechain/qoresign";
 
 const OUT = new URL("../../contracts/out/", import.meta.url);
 const ready = existsSync(new URL("MockPqc.sol/MockVerify.json", OUT)) && spawnSync("anvil", ["--version"]).status === 0;
@@ -88,6 +91,7 @@ describe.skipIf(!ready)("the app against the real contract (local chain)", () =>
   let app: Crumena;
   const seen: string[] = [];
   let tamper: ((s: string) => string) | undefined;
+  let timeShift = 0; // ms the local chain's clock is ahead after increaseTime
 
   /** What the browser's fetch reaches: /rpc goes to the chain, /api/relay sends the call like the relayer does. */
   const fakeFetch: typeof fetch = async (input, init) => {
@@ -147,7 +151,7 @@ describe.skipIf(!ready)("the app against the real contract (local chain)", () =>
     const t2 = await wallet(relayerAcct).deployContract({ abi: CRUMENA_ABI, bytecode: CRUMENA_BYTECODE, args: ["qorechain-diana", 9800n] });
     crumena = (await pub.waitForTransactionReceipt({ hash: t2 })).contractAddress!;
 
-    app = createCrumena({ chainId: "qorechain-diana", evmChainId: 9800, crumena, fusd: token, relayer: toQor(relayerAcct.address), fromBlock: 0 }, { base: "http://app.test", fetch: fakeFetch });
+    app = createCrumena({ chainId: "qorechain-diana", evmChainId: 9800, crumena, fusd: token, relayer: toQor(relayerAcct.address), fromBlock: 0 }, { base: "http://app.test", fetch: fakeFetch, now: () => Date.now() + timeShift });
   }, 30_000);
 
   afterAll(() => anvil?.kill());
@@ -269,10 +273,54 @@ describe.skipIf(!ready)("the app against the real contract (local chain)", () =>
     await mint(short.vault, 5n * FUSD);
     await expect(app.reclaim(short)).rejects.toSatisfy((e) => explain(e).includes("only after the end date"));
     await test.increaseTime({ seconds: 3601 });
+    timeShift += 3_601_000;
     await test.mine({ blocks: 1 });
     const before = await fusdOf(funderAcct.address);
-    await app.reclaim(short);
+    const back = await app.reclaim(short);
     expect((await fusdOf(funderAcct.address)) - before).toBe(5n * FUSD);
+    expect(await verifyAction(app, back.hash)).toMatchObject({ fn: "reclaim", signed: false });
+  });
+
+  it("verifies a real ML-DSA-87 signature in the browser, from the chain's own records", async () => {
+    // A real key pair: the funder's registered key becomes a real ML-DSA-87 public key, and the stand-in
+    // verifier on this local chain accepts any signature, so only the browser's check decides here.
+    const real = pqKeyFromSeed(new Uint8Array(32).fill(9));
+    const status = "0x0000000000000000000000000000000000000a02" as Address;
+    const ks = artifact("MockPqc.sol/MockKeyStatus.json");
+    await pub.waitForTransactionReceipt({
+      hash: await wallet(relayerAcct).writeContract({ address: status, abi: ks.abi, functionName: "set", args: [funderAcct.address, true, 1, toHex(real.publicKey), true] }),
+    });
+    await test.setCode({ address: "0x0000000000000000000000000000000000000a01", bytecode: "0x600160005260206000f3" });
+
+    const signer = demoSigner({
+      role: "funder",
+      qor: toQor(funderAcct.address),
+      evm: funderAcct.address,
+      privateKey: KEYS[1],
+      pqSecretKey: btoa(String.fromCharCode(...real.secretKey)),
+    });
+    const created = await app.createPot(signer, meOf(funderAcct), {
+      funder: funderAcct.address,
+      recipient: spenderAcct.address,
+      token,
+      endsAt: (await chainNow()) + 86_400n,
+      confirmedOnly: false,
+      rules: { maxPerPayment: 5n * FUSD, periodLimit: 20n * FUSD, periodDays: 7 },
+      purpose: "Verified pot",
+      payees: [shopAcct.address],
+      names: ["Halden Building Supplies"],
+    });
+    const ok = await verifyAction(app, created.hash);
+    expect(ok).toMatchObject({ fn: "createPot", signed: true, signer: funderAcct.address, valid: true });
+    expect(ok.statement).toContain("Limit per period: 20 fUSD every 7 days");
+    expect(ok.keyFingerprint).toMatch(/^[0-9a-f]{16}$/);
+
+    // A transaction signed with a different key than the one on record fails the browser's check.
+    const fresh = await app.pot(BigInt(created.potId!));
+    const other = pqKeyFromSeed(new Uint8Array(32).fill(7));
+    const forged = demoSigner({ role: "funder", qor: toQor(funderAcct.address), evm: funderAcct.address, privateKey: KEYS[1], pqSecretKey: btoa(String.fromCharCode(...other.secretKey)) });
+    const sent2 = await app.extend(forged, meOf(funderAcct), fresh, fresh.endsAt + 7200n);
+    expect(await verifyAction(app, sent2.hash)).toMatchObject({ fn: "extend", valid: false });
   });
 });
 

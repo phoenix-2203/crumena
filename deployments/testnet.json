@@ -1,0 +1,11 @@
+{
+  "chainId": "qorechain-diana",
+  "evmChainId": 9800,
+  "Crumena": "0xD98320A95030874498b92e9cf66f95F83dDe47af",
+  "deployTx": "0x18f434fe6bf58e04823510778e084779d01a99c721a33c8dd3c9f2ed182dea78",
+  "block": 10776914,
+  "deployer": "qor1ey4prsgv94zc4gdf8dzdupagwj2mstz5tlh9xh",
+  "window": "58C3751E7D33E03567D41F7CF6AD574134BF4097E61A3F519F9EB61959481AFE",
+  "compiler": "solc 0.8.28, optimizer 200 runs, via-IR, evm cancun (contracts/foundry.toml)",
+  "sourceCommit": "da53d0a916b9772788034a690541ad6685f8efd6"
+}

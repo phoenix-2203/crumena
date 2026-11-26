@@ -22,6 +22,7 @@ import {
   PRIORITY_FEE,
   REST,
   convertFusdMsg,
+  cosmosHashOf,
   explorerTx,
   publicClient,
   registerPqcKey,
@@ -41,7 +42,7 @@ type Step = { step: string; ok: boolean; detail: string; tx?: string };
 const steps: Step[] = [];
 function record(step: string, ok: boolean, detail: string, tx?: string) {
   steps.push({ step, ok, detail, tx });
-  console.log(`${ok ? "PASS" : "FAIL"}  ${step}\n      ${detail}${tx ? `\n      ${explorerTx(tx)}` : ""}`);
+  console.log(`${ok ? "PASS" : "FAIL"}  ${step}\n      ${detail}${tx ? `\n      ${tx.startsWith("0x") ? `EVM tx ${tx}` : explorerTx(tx)}` : ""}`);
 }
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const FUSD_UNIT = 1_000_000n;
@@ -101,6 +102,7 @@ const newPot = {
   token: FUSD,
   endsAt: BigInt(Math.floor(Date.now() / 1000) + 14 * 86400),
   confirmedOnly: false,
+  rules: { maxPerPayment: 30n * FUSD_UNIT, periodLimit: 60n * FUSD_UNIT, periodDays: 7 },
   purpose: "Office fit-out, phase 1",
   payees: [shopA.evm],
   names: ["Halden Building Supplies"],
@@ -236,7 +238,34 @@ const goodText = await read<string>("payStatement", [potId, shopA.evm, FUSD_UNIT
 const f = await refused("pay", [potId, shopA.evm, 50n * FUSD_UNIT, "", spender.evm, { nonce: n, validUntil: v, signature: spender.signText(goodText) }]);
 record("Attack: raise the amount after the spender signed 1 fUSD", f === "BadPqcSignature", `refused: ${f}`);
 
-// ------------------------------------------------------ 7. leftovers go back
+// ------------------------------------------------------------- 7. the rules hold
+
+async function signedPay(amount: bigint) {
+  const n2 = await nonce(spender);
+  const v2 = until();
+  const text = await read<string>("payStatement", [potId, shopA.evm, amount, "", spender.evm, n2, v2]);
+  return [potId, shopA.evm, amount, "", spender.evm, { nonce: n2, validUntil: v2, signature: spender.signText(text) }];
+}
+const overCap = await refused("pay", await signedPay(31n * FUSD_UNIT));
+record("Rule: a payment over the 30 fUSD cap is refused, even properly signed", overCap === "OverPaymentLimit", `refused: ${overCap}`);
+
+const within = await relay("pay", await signedPay(20n * FUSD_UNIT));
+const spentNow = (await read<readonly [bigint, bigint, bigint]>("periodSpending", [potId]))[0];
+record("Rule: payments count towards the 60 fUSD weekly limit", spentNow === 55n * FUSD_UNIT, `${spentNow / FUSD_UNIT} of 60 fUSD spent this week`, within.hash);
+
+const overWeek = await refused("pay", await signedPay(6n * FUSD_UNIT));
+record("Rule: a payment past the weekly limit is refused", overWeek === "OverPeriodLimit", `refused: ${overWeek} (5 fUSD left this week)`);
+
+n = await nonce(funder);
+v = until();
+const freezeText = await read<string>("frozenStatement", [potId, true, n, v]);
+const frozen = await relay("setFrozen", [potId, true, { nonce: n, validUntil: v, signature: funder.signText(freezeText) }]);
+record("The funder freezes the pot (the lost-phone button), post-quantum signed", (await read<{ frozen: boolean }>("potInfo", [potId])).frozen, "frozen", frozen.hash);
+
+const whileFrozen = await refused("pay", await signedPay(FUSD_UNIT));
+record("A properly signed payment from a frozen pot is refused", whileFrozen === "PotFrozen", `refused: ${whileFrozen}`);
+
+// ------------------------------------------------------ 8. leftovers go back
 
 const shortPot = { ...newPot, endsAt: BigInt(Math.floor(Date.now() / 1000) + 120), purpose: "Short pot: leftovers return", payees: [shopA.evm] };
 n = await nonce(funder);
@@ -255,6 +284,7 @@ record("After the end date, the rest goes back to the funder (anyone may trigger
 
 // -------------------------------------------------------------------- results
 
+for (const s of steps) if (s.tx?.startsWith("0x")) (s as Step & { qorechainTx?: string }).qorechainTx = await cosmosHashOf(s.tx);
 const passed = steps.filter((s) => s.ok).length;
 console.log(`\n${passed} of ${steps.length} checks passed.`);
 mkdirSync(new URL("../../drill-results", import.meta.url), { recursive: true });

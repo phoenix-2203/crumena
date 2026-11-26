@@ -196,4 +196,15 @@ export async function registerPqcKey(acc: UnifiedAccount): Promise<string> {
   return res.transactionHash;
 }
 
-export const explorerTx = (hash: string) => `${EXPLORER}/tx/${hash}`;
+/**
+ * The explorer link for a transaction. The explorer (switched to Testnet) finds transactions by their
+ * QoreChain hash, so a contract call's 0x hash is looked up first.
+ */
+export const explorerTx = (hash: string) => `${EXPLORER}/tx/${hash.replace(/^0x/, "")}`;
+
+/** The QoreChain transaction hash that carried an EVM transaction (what the explorer shows). */
+export async function cosmosHashOf(evmHash: string): Promise<string | undefined> {
+  const q = encodeURIComponent(`ethereum_tx.ethereumTxHash='${evmHash}'`);
+  const r = await rest<{ tx_responses?: { txhash: string }[] }>(`/cosmos/tx/v1beta1/txs?query=${q}`).catch(() => undefined);
+  return r?.tx_responses?.[0]?.txhash;
+}

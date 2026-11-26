@@ -47,6 +47,12 @@ interface Saved {
   lastHonest?: { args: unknown[]; hash: string };
 }
 
+/** pay(potId, payee, amount, memo, signer, auth) arguments, with the numbers as bigints again. */
+function revivePay(a: unknown[]): unknown[] {
+  const auth = a[5] as { nonce: string | bigint; validUntil: string | bigint; signature: Hex };
+  return [BigInt(a[0] as string), a[1], BigInt(a[2] as string), a[3], a[4], { nonce: BigInt(auth.nonce), validUntil: BigInt(auth.validUntil), signature: auth.signature }];
+}
+
 export interface TryResult {
   attack: Attack | "honest";
   what: string;
@@ -178,7 +184,7 @@ export function createChallenge(opts: {
         break;
       case "replay":
         if (!saved!.lastHonest) throw new RelayError("There's no earlier payment to replay yet. Make the honest payment first.", 409);
-        args = saved!.lastHonest.args;
+        args = revivePay(saved!.lastHonest.args); // read back from JSON: numbers come back as strings
         break;
       case "wrongKey":
         ({ statement, args } = await signedPay(s.spender, s.payee.evm, HONEST_AMOUNT, HONEST_AMOUNT, s.outsider));

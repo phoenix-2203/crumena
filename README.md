@@ -6,7 +6,7 @@ A *crumena* was the Roman purse you carried for a purpose. Crumena makes that pu
 
 Built for QoreChain's *Build Before Q-Day* fest, Post-Quantum dApp track.
 
-> **Live on QoreChain testnet** at `0xD98320A95030874498b92e9cf66f95F83dDe47af`. The live run passed **21 of 21** checks with real ML-DSA-87 signatures: the whole flow, the spending rules and freezing, an independent off-chain check of a payment's signature, and six attacks refused. Details and explorer links: [`docs/TESTNET_RUN.md`](docs/TESTNET_RUN.md). Tests: 119 contract, 12 server, 27 app.
+> **Live on QoreChain testnet** at `0xD98320A95030874498b92e9cf66f95F83dDe47af`. The live run passed **21 of 21** checks with real ML-DSA-87 signatures: the whole flow, the spending rules and freezing, an independent off-chain check of a payment's signature, and six attacks refused. Details and explorer links: [`docs/TESTNET_RUN.md`](docs/TESTNET_RUN.md). Tests: 133 contract, 12 server, 27 app. QCAI audit Stage 1: 82/100, every finding answered in [`docs/AUDIT.md`](docs/AUDIT.md).
 
 ## Try it in two minutes
 
@@ -146,7 +146,7 @@ On a server with Caddy, as root: `bash <(curl -fsSL https://raw.githubuserconten
 
 ## Tests
 
-- **Contracts** (`forge test`, 119): creating pots, paying, payees, lifecycle, spending rules and freezing (with a fuzz over periods), the exact statement texts, the PQC checks (both precompile answer layouts, missing or odd precompiles, rotated keys, another chain) and 4 invariants (money accounted for, an attacker gets nothing, the contract holds nothing, paid ≤ funded).
+- **Contracts** (`forge test`, 133): creating pots, paying, payees, lifecycle, spending rules and freezing (with a fuzz over periods), the exact statement texts, the PQC checks (both precompile answer layouts, missing or odd precompiles, rotated keys, another chain), 4 invariants (money accounted for, an attacker gets nothing, the contract holds nothing, paid ≤ funded), and a regression test for each QCAI finding.
 - **Server** (`vitest`, 12): what the relayer will and won't send, every contract error in plain words, a real ML-DSA-87 signature in QoreX's format, `MsgConvertCoin`, the deposit index, demo limits, and the history index against the contract on anvil.
 - **App** (`vitest`, 27): addresses, amounts and dates matching the contract; the QoreX adapter; the whole flow against the contract on anvil (create, fund, pay, confirm, request and approve, refusals, limits, freezing, a tampered statement that never reaches QoreX, release, reclaim); and **Verify** with a real ML-DSA-87 signature (valid) and one from a different key (invalid).
 - **Live** (`testnet:run`): 21 checks against the chain's own precompiles: the flow, the rules and freezing, an off-chain signature check, and six attacks. Last run: 21 of 21 ([`docs/TESTNET_RUN.md`](docs/TESTNET_RUN.md)).
@@ -155,7 +155,10 @@ Precompile stand-ins: anvil has no QoreChain precompiles, so local tests place s
 
 ## Audit
 
-QoreChain's QCAI audit, in two stages: reports in `docs/audit/`, each Stage 1 finding mapped to what was done in [`docs/AUDIT.md`](docs/AUDIT.md). *(Pending.)*
+QoreChain's QCAI audit, "Ethereum (EVM/Solidity)" setting, on the deployed code as one file ([`docs/audit/Crumena.audit.sol`](docs/audit/Crumena.audit.sol)).
+
+- **Stage 1** (26 Nov 2026): 82/100, five findings ([report](docs/audit/stage1-2026-11-26.pdf)). Each is answered in [`docs/AUDIT.md`](docs/AUDIT.md) with regression tests in [`contracts/test/Audit.t.sol`](contracts/test/Audit.t.sol). None needed a contract change: the nonce, overflow, return-value, loop and ordering concerns are each already prevented, and the tests show it.
+- **Stage 2**: pending.
 
 ## Credits
 

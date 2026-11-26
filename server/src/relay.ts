@@ -122,7 +122,14 @@ export function createRelayer(account: Account, crumena: Hex, log: (s: string) =
     return result;
   }
 
-  return { relay, parse, simulate, ensureWindow };
+  /** Runs other work from the relayer's account (native transactions) in the same queue, so sequences never clash. */
+  function exclusive<T>(work: () => Promise<T>): Promise<T> {
+    const result = queue.then(work);
+    queue = result.catch(() => undefined);
+    return result;
+  }
+
+  return { relay, parse, simulate, ensureWindow, exclusive };
 }
 
 /** The name of the contract error behind a failed call, if any. */

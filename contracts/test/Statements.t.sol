@@ -164,6 +164,8 @@ contract StatementTest is Base {
                 Text.hexAddress(address(token)),
                 ")\nEnds: 2026-12-26 09:00 UTC\n",
                 "Pay only payees who confirmed: no\n",
+                "Limit per payment: none\n",
+                "Limit per period: none\n",
                 "Payees:\n",
                 "1. Halden Building Supplies, ",
                 Text.hexAddress(supplierA),
@@ -181,6 +183,47 @@ contract StatementTest is Base {
         );
     }
 
+    function test_whatTheFunderSignsForRulesAndFreezing() public {
+        funder = FUNDER;
+        recipient = ADA;
+        _register(FUNDER, 11);
+        Crumena.NewPot memory p = _newPot();
+        p.rules = Crumena.Rules({maxPerPayment: 50 * FUSD, periodLimit: 200_500_000, periodDays: 7});
+        assertTrue(_contains(crumena.createStatement(p, 0, uint64(START + 3600)), "\nLimit per payment: 50 fUSD\nLimit per period: 200.5 fUSD every 7 days\nPayees:\n"));
+        uint256 potId = _createSigned(p);
+
+        Crumena.Rules memory daily = Crumena.Rules({maxPerPayment: 0, periodLimit: 20 * FUSD, periodDays: 1});
+        assertEq(
+            crumena.rulesStatement(potId, daily, 1, uint64(START + 3600)),
+            string.concat(
+                "Crumena: change the spending rules of pot #1\n",
+                "Pot: Office fit-out, phase 1\n",
+                "Limit per payment: none\n",
+                "Limit per period: 20 fUSD every 1 day\n",
+                "Signed by: qor1w3yt7jnev05p4d8e8vgczkdfrd72mxezajpegh\n",
+                "Nonce: 1\n",
+                "Valid until: 2026-11-26 10:00 UTC\n",
+                "Contract: ",
+                Text.hexAddress(address(crumena)),
+                " on qorechain-diana"
+            )
+        );
+        assertEq(
+            crumena.frozenStatement(potId, true, 1, uint64(START + 3600)),
+            string.concat(
+                "Crumena: freeze pot #1 (no payments until the funder unfreezes it)\n",
+                "Pot: Office fit-out, phase 1\n",
+                "Signed by: qor1w3yt7jnev05p4d8e8vgczkdfrd72mxezajpegh\n",
+                "Nonce: 1\n",
+                "Valid until: 2026-11-26 10:00 UTC\n",
+                "Contract: ",
+                Text.hexAddress(address(crumena)),
+                " on qorechain-diana"
+            )
+        );
+        assertTrue(_contains(crumena.frozenStatement(potId, false, 1, uint64(START + 3600)), "Crumena: unfreeze pot #1 (payments allowed again)\n"));
+    }
+
     function test_anEmptyMemoReadsAsADash() public {
         uint256 potId = _fundedPot(10 * FUSD);
         string memory st = crumena.payStatement(potId, supplierA, FUSD, "", recipient, 0, uint64(START + 60));
@@ -189,9 +232,10 @@ contract StatementTest is Base {
 
     function test_everyStatementFitsInAQoreXMessage() public {
         // QoreX signs 1 to 4096 bytes. The longest statement is a create with ten
-        // payees and every text field at its maximum length.
+        // payees, every text field at its maximum length and the largest rules.
         Crumena.NewPot memory p = _newPot();
         p.purpose = _repeat("P", 80);
+        p.rules = Crumena.Rules({maxPerPayment: type(uint256).max, periodLimit: type(uint256).max, periodDays: 366});
         p.payees = new address[](10);
         p.names = new string[](10);
         for (uint256 i; i < 10; ++i) {

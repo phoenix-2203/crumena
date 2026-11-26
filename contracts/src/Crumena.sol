@@ -17,6 +17,10 @@ import {PotVault} from "./PotVault.sol";
 ///         (pqcVerify). Anyone can submit a signed action, so a relayer can pay the gas;
 ///         nobody can change it. A stolen classical (ECDSA) key signs nothing here.
 ///
+///         The funder can also set spending rules (a cap per payment, a limit per
+///         period, such as 200 a week) and freeze the pot at once if something looks
+///         wrong; each of those is a signed statement too.
+///
 ///         Each pot's money sits in its own vault, an address anyone can pay into.
 ///         There is no owner, no admin key, no fee and no upgrade.
 contract Crumena {
@@ -32,7 +36,13 @@ contract Crumena {
         uint8 decimals; // token decimals, read once at creation
         bool confirmedOnly; // pay only payees who confirmed their address with their own key
         bool closed;
+        bool frozen; // the funder froze it: no payments until unfrozen
+        uint32 periodDays; // length of a spending period in days (0: no period limit)
+        uint64 periodIndex; // which period spentInPeriod counts (periods start at createdAt)
         uint256 paidOut; // total paid to payees
+        uint256 maxPerPayment; // largest single payment (0: no cap)
+        uint256 periodLimit; // most that can be paid in one period (0: no limit)
+        uint256 spentInPeriod; // paid so far in period periodIndex
         string symbol; // token symbol, read once at creation
         string purpose; // what the money is for
     }
@@ -44,6 +54,13 @@ contract Crumena {
         string name;
     }
 
+    /// @notice Spending rules. Zero means no rule. A period limit needs a period length.
+    struct Rules {
+        uint256 maxPerPayment;
+        uint256 periodLimit;
+        uint32 periodDays;
+    }
+
     /// @notice What the funder signs to create a pot.
     struct NewPot {
         address funder;
@@ -51,6 +68,7 @@ contract Crumena {
         address token;
         uint64 endsAt;
         bool confirmedOnly;
+        Rules rules;
         string purpose;
         address[] payees;
         string[] names;
@@ -72,6 +90,7 @@ contract Crumena {
     uint256 public constant MAX_NAME = 48;
     uint256 public constant MAX_MEMO = 80;
     uint256 public constant MAX_SIGNATURE_LIFETIME = 7 days;
+    uint256 public constant MAX_PERIOD_DAYS = 366;
 
     /// @notice The chain id string QoreX puts in front of every message it signs.
     string public chainName;
@@ -107,6 +126,8 @@ contract Crumena {
     event PayeeConfirmed(uint256 indexed potId, address indexed payee);
     event Paid(uint256 indexed potId, address indexed payee, uint256 amount, string memo, address indexed by);
     event EndChanged(uint256 indexed potId, uint64 endsAt);
+    event RulesChanged(uint256 indexed potId, uint256 maxPerPayment, uint256 periodLimit, uint32 periodDays);
+    event FrozenChanged(uint256 indexed potId, bool frozen);
     event Released(uint256 indexed potId, address indexed recipient, uint256 amount);
     event Reclaimed(uint256 indexed potId, address indexed funder, uint256 amount);
     event Signed(address indexed signer, uint256 nonce);
@@ -133,6 +154,11 @@ contract Crumena {
     error ZeroAmount();
     error NotEnoughInPot(uint256 available, uint256 asked);
     error NothingToMove();
+    error BadRules();
+    error PotFrozen();
+    error OverPaymentLimit(uint256 limit);
+    error OverPeriodLimit(uint256 remaining);
+    error NoChange();
 
     constructor(string memory chainName_, uint256 evmChainId_) {
         if (block.chainid != evmChainId_) revert WrongChain();
@@ -160,6 +186,9 @@ contract Crumena {
         pot.endsAt = p.endsAt;
         pot.decimals = decimals;
         pot.confirmedOnly = p.confirmedOnly;
+        pot.maxPerPayment = p.rules.maxPerPayment;
+        pot.periodLimit = p.rules.periodLimit;
+        pot.periodDays = p.rules.periodDays;
         pot.symbol = symbol;
         pot.purpose = p.purpose;
         potOfVault[vault] = potId;
@@ -167,6 +196,9 @@ contract Crumena {
         if (p.recipient != p.funder) _potsOf[p.recipient].push(potId);
 
         emit PotCreated(potId, p.funder, p.recipient, vault, p.token, p.endsAt, p.confirmedOnly, p.purpose);
+        if (p.rules.maxPerPayment != 0 || p.rules.periodDays != 0) {
+            emit RulesChanged(potId, p.rules.maxPerPayment, p.rules.periodLimit, p.rules.periodDays);
+        }
         for (uint256 i; i < p.payees.length; ++i) _approve(potId, p.payees[i], p.names[i]);
     }
 
@@ -181,11 +213,19 @@ contract Crumena {
         if (!p.approved) revert NotApproved();
         if (pot.confirmedOnly && !p.confirmed) revert NotConfirmed();
         if (amount == 0) revert ZeroAmount();
+        if (pot.frozen) revert PotFrozen();
+        if (pot.maxPerPayment != 0 && amount > pot.maxPerPayment) revert OverPaymentLimit(pot.maxPerPayment);
+        (uint64 period, uint256 spent) = _periodSpent(pot);
+        if (pot.periodDays != 0 && spent + amount > pot.periodLimit) revert OverPeriodLimit(pot.periodLimit - spent);
         Text.requirePrintableOrEmpty(memo, MAX_MEMO);
         uint256 available = balanceOf(potId);
         if (amount > available) revert NotEnoughInPot(available, amount);
         _authorize(signer, payStatement(potId, payee, amount, memo, signer, a.nonce, a.validUntil), a);
 
+        if (pot.periodDays != 0) {
+            pot.periodIndex = period;
+            pot.spentInPeriod = spent + amount;
+        }
         pot.paidOut += amount;
         emit Paid(potId, payee, amount, memo, signer);
         PotVault(pot.vault).send(pot.token, payee, amount);
@@ -244,6 +284,32 @@ contract Crumena {
         emit EndChanged(potId, newEndsAt);
     }
 
+    /// @notice Change the spending rules. Signed by the funder. Changing the period length
+    ///         starts counting afresh; otherwise what was spent this period still counts.
+    function setRules(uint256 potId, Rules calldata r, Auth calldata a) external {
+        Pot storage pot = _openPot(potId);
+        _checkRules(r);
+        _authorize(pot.funder, rulesStatement(potId, r, a.nonce, a.validUntil), a);
+        if (r.periodDays != pot.periodDays) {
+            pot.periodDays = r.periodDays;
+            pot.spentInPeriod = 0;
+            pot.periodIndex = r.periodDays == 0 ? 0 : _periodIndex(pot);
+        }
+        pot.maxPerPayment = r.maxPerPayment;
+        pot.periodLimit = r.periodLimit;
+        emit RulesChanged(potId, r.maxPerPayment, r.periodLimit, r.periodDays);
+    }
+
+    /// @notice Freeze the pot (no payments) or unfreeze it. Signed by the funder. Freezing
+    ///         is for when something looks wrong, such as the spender's phone being lost.
+    function setFrozen(uint256 potId, bool frozen, Auth calldata a) external {
+        Pot storage pot = _openPot(potId);
+        if (pot.frozen == frozen) revert NoChange();
+        _authorize(pot.funder, frozenStatement(potId, frozen, a.nonce, a.validUntil), a);
+        pot.frozen = frozen;
+        emit FrozenChanged(potId, frozen);
+    }
+
     /// @notice Give everything left to the recipient, with no more restrictions, and
     ///         close the pot. Signed by the funder.
     function release(uint256 potId, Auth calldata a) external {
@@ -276,7 +342,7 @@ contract Crumena {
     // same text, with QoreX's prefix "qorechain-msg-v1|<chain id>|" in front.
 
     function createStatement(NewPot calldata p, uint256 nonce, uint64 validUntil) public view returns (string memory) {
-        (, string memory symbol) = _tokenInfo(p.token);
+        (uint8 decimals, string memory symbol) = _tokenInfo(p.token);
         string memory s = string.concat(
             "Crumena: create a pot\nPurpose: ",
             p.purpose,
@@ -290,6 +356,7 @@ contract Crumena {
             Text.utc(p.endsAt),
             "\nPay only payees who confirmed: ",
             p.confirmedOnly ? "yes" : "no",
+            _rulesText(p.rules, decimals, symbol),
             "\nPayees:"
         );
         for (uint256 i; i < p.payees.length; ++i) {
@@ -420,6 +487,38 @@ contract Crumena {
         );
     }
 
+    function rulesStatement(uint256 potId, Rules calldata r, uint256 nonce, uint64 validUntil)
+        public
+        view
+        returns (string memory)
+    {
+        Pot storage pot = _existing(potId);
+        return string.concat(
+            "Crumena: change the spending rules of pot #",
+            Text.decimal(potId),
+            "\nPot: ",
+            pot.purpose,
+            _rulesText(r, pot.decimals, pot.symbol),
+            _footer(pot.funder, nonce, validUntil)
+        );
+    }
+
+    function frozenStatement(uint256 potId, bool frozen, uint256 nonce, uint64 validUntil)
+        public
+        view
+        returns (string memory)
+    {
+        Pot storage pot = _existing(potId);
+        return string.concat(
+            frozen ? "Crumena: freeze pot #" : "Crumena: unfreeze pot #",
+            Text.decimal(potId),
+            frozen ? " (no payments until the funder unfreezes it)" : " (payments allowed again)",
+            "\nPot: ",
+            pot.purpose,
+            _footer(pot.funder, nonce, validUntil)
+        );
+    }
+
     function releaseStatement(uint256 potId, uint256 nonce, uint64 validUntil) public view returns (string memory) {
         Pot storage pot = _existing(potId);
         return string.concat(
@@ -450,6 +549,16 @@ contract Crumena {
         (bool ok, bytes memory ret) = pot_.token.staticcall(abi.encodeWithSelector(0x70a08231, pot_.vault)); // balanceOf(address)
         if (!ok || ret.length != 32) revert BadToken();
         return abi.decode(ret, (uint256));
+    }
+
+    /// @notice Spending in the current period: paid so far, the limit, and when the next
+    ///         period starts. All zero when the pot has no period limit.
+    function periodSpending(uint256 potId) external view returns (uint256 spent, uint256 limit, uint64 resetsAt) {
+        Pot storage pot_ = _existing(potId);
+        if (pot_.periodDays == 0) return (0, 0, 0);
+        (uint64 period, uint256 spent_) = _periodSpent(pot_);
+        uint256 len = uint256(pot_.periodDays) * 1 days;
+        return (spent_, pot_.periodLimit, uint64(pot_.createdAt + (uint256(period) + 1) * len));
     }
 
     /// @notice Every payee ever approved or requested for a pot, with its state.
@@ -487,6 +596,38 @@ contract Crumena {
         Pqc.requireSignedBy(signer, signedBytes(statement), a.signature);
         nonceOf[signer] = a.nonce + 1;
         emit Signed(signer, a.nonce);
+    }
+
+    function _checkRules(Rules memory r) internal pure {
+        if (r.periodDays > MAX_PERIOD_DAYS || (r.periodLimit == 0) != (r.periodDays == 0)) revert BadRules();
+    }
+
+    function _periodIndex(Pot storage pot_) internal view returns (uint64) {
+        // forge-lint: disable-next-line(unsafe-typecast) a day count over 64 bits is unreachable
+        return uint64((block.timestamp - pot_.createdAt) / (uint256(pot_.periodDays) * 1 days));
+    }
+
+    /// @dev The current period and what has been paid in it (0 once a new period starts).
+    function _periodSpent(Pot storage pot_) internal view returns (uint64 period, uint256 spent) {
+        if (pot_.periodDays == 0) return (0, 0);
+        period = _periodIndex(pot_);
+        spent = period == pot_.periodIndex ? pot_.spentInPeriod : 0;
+    }
+
+    function _rulesText(Rules memory r, uint8 decimals, string memory symbol) internal pure returns (string memory) {
+        string memory perPayment =
+            r.maxPerPayment == 0 ? "none" : string.concat(Text.units(r.maxPerPayment, decimals), " ", symbol);
+        string memory perPeriod = r.periodLimit == 0
+            ? "none"
+            : string.concat(
+                Text.units(r.periodLimit, decimals),
+                " ",
+                symbol,
+                " every ",
+                Text.decimal(r.periodDays),
+                r.periodDays == 1 ? " day" : " days"
+            );
+        return string.concat("\nLimit per payment: ", perPayment, "\nLimit per period: ", perPeriod);
     }
 
     function _footer(address signer, uint256 nonce, uint64 validUntil) internal view returns (string memory) {
@@ -535,6 +676,7 @@ contract Crumena {
         if (p.funder == address(0) || p.recipient == address(0)) revert BadAddress();
         if (p.endsAt <= block.timestamp) revert BadEnd();
         Text.requirePrintable(p.purpose, MAX_PURPOSE);
+        _checkRules(p.rules);
         if (p.payees.length == 0 || p.payees.length > MAX_PAYEES_AT_CREATION || p.names.length != p.payees.length) {
             revert TooManyPayees();
         }

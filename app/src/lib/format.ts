@@ -52,3 +52,10 @@ export function printable(s: string): boolean {
 
 export const fromUnix = (t: bigint | number) => new Date(Number(t) * 1000);
 export const toUnix = (d: Date) => BigInt(Math.floor(d.getTime() / 1000));
+
+/** "2026-11-26 09:00 UTC", the contract's date format (minutes, seconds dropped). */
+export function utc(t: bigint | number): string {
+  const d = fromUnix(t);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())} UTC`;
+}

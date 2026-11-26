@@ -41,3 +41,9 @@ it("accepts only printable ASCII, like the contract", () => {
   expect(printable("line\nbreak")).toBe(false);
   expect(printable("Pаypal")).toBe(false); // Cyrillic а
 });
+
+it("prints dates like the contract (minutes, UTC)", async () => {
+  const { utc } = await import("../src/lib/format");
+  expect(utc(1_795_683_600n)).toBe("2026-11-26 09:00 UTC"); // START in contracts/test/Base.t.sol
+  expect(utc(1_795_683_659)).toBe("2026-11-26 09:00 UTC");
+});

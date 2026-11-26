@@ -343,3 +343,8 @@ footer.site a:hover { color: var(--ink); }
 .skeleton { height: 230px; background: linear-gradient(100deg, var(--surface) 40%, var(--surface-2) 50%, var(--surface) 60%) 0 0 / 200% 100%; animation: shimmer 1.4s linear infinite; }
 @keyframes shimmer { to { background-position: -200% 0; } }
 .empty { text-align: center; padding: 56px 24px; margin-top: 24px; }
+
+/* ---------- new pot ---------- */
+.new-pot .form-section:first-of-type { margin-top: 20px; }
+.submit-bar { position: sticky; bottom: 16px; z-index: 5; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 14px 16px 14px 14px; margin-top: 12px; border: 1px solid var(--line); border-radius: 999px; background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(12px); box-shadow: var(--shadow); }
+@media (max-width: 640px) { .submit-bar { border-radius: 20px; } }

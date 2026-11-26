@@ -117,14 +117,22 @@ function Form() {
     );
 
   return (
-    <div className="stack" style={{ maxWidth: 720 }}>
-      <h1>New pot</h1>
-      <p className="muted">
-        You fund it and set the rules. The spender can only pay the payees you list (or that you approve later), within your limits. Paid in fUSD on QoreChain
-        testnet.
-      </p>
+    <div className="new-pot">
+      <div className="page-head">
+        <span className="label">Step 1 of 2 · then you sign</span>
+        <h1 style={{ marginTop: 14 }}>New pot</h1>
+        <p className="lead">
+          You fund it and set the rules. The spender can only pay the payees you list (or that you approve later), within your limits. Paid in fUSD on QoreChain
+          testnet.
+        </p>
+      </div>
 
-      <div className="card stack">
+      <section className="form-section">
+        <header>
+          <h2>The pot</h2>
+          <p>What it's for and who spends it.</p>
+        </header>
+        <div className="card stack">
         <label className="field">
           What is it for?
           <span className="hint">Shown in every statement anyone signs for this pot.</span>
@@ -137,10 +145,15 @@ function Form() {
           <input value={spender} onChange={(e) => setSpender(e.target.value)} placeholder="qor1…" spellCheck={false} />
           {errors.spender && <div className="error">{errors.spender}</div>}
         </label>
-      </div>
+        </div>
+      </section>
 
-      <div className="card stack">
-        <h2>Who can be paid</h2>
+      <section className="form-section">
+        <header>
+          <h2>Who can be paid</h2>
+          <p>Only these addresses can receive money from the pot. You can approve more later.</p>
+        </header>
+        <div className="card stack">
         {payees.map((p, i) => (
           <div className="grid cols-2" key={i}>
             <label className="field">
@@ -171,10 +184,15 @@ function Form() {
           <input type="checkbox" checked={confirmedOnly} onChange={(e) => setConfirmedOnly(e.target.checked)} />
           Only pay payees who have confirmed the address is theirs, with their own post-quantum key
         </label>
-      </div>
+        </div>
+      </section>
 
-      <div className="card stack">
-        <h2>Limits</h2>
+      <section className="form-section">
+        <header>
+          <h2>Limits</h2>
+          <p>Caps the contract enforces on every payment, and when the pot ends.</p>
+        </header>
+        <div className="card stack">
         <div className="grid cols-2">
           <label className="field">
             Most per payment (fUSD)
@@ -209,10 +227,11 @@ function Form() {
             ))}
           </select>
         </label>
-      </div>
+        </div>
+      </section>
 
-      <div className="row">
-        <button className="btn primary" onClick={submit} disabled={busy} aria-busy={busy}>
+      <div className="submit-bar">
+        <button className="btn primary big" onClick={submit} disabled={busy} aria-busy={busy}>
           {busy ? "Working…" : "Review and sign"}
         </button>
         <span className="muted small">You'll see the exact text before you sign. No gas needed.</span>

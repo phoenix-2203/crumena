@@ -1,7 +1,8 @@
 /**
- * The latest live run on QoreChain testnet (server/scripts/testnet-run.ts), shown on the home page.
- * Filled in from drill-results after each run; nothing here is written by hand.
+ * The latest live run on QoreChain testnet (server/scripts/testnet-run.ts), shown on the home page:
+ * docs/testnet-run.json is that run's own output file, copied unchanged.
  */
+import run from "../../docs/testnet-run.json";
 export interface ProofStep {
   step: string;
   ok: boolean;
@@ -16,4 +17,4 @@ export interface Proof {
   total: number;
   steps: ProofStep[];
 }
-export const PROOF: Proof | undefined = undefined;
+export const PROOF: Proof | undefined = run as Proof;

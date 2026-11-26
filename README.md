@@ -6,7 +6,7 @@ A *crumena* was the Roman purse you carried for a purpose. Crumena makes that pu
 
 Built for QoreChain's *Build Before Q-Day* fest, Post-Quantum dApp track.
 
-> **Status.** Contracts, relayer and app are built and tested (119 contract tests, 12 server, 27 app, including the app's whole flow against the real contract on a local chain). An earlier build of the contract ran live on testnet, 15 of 15 checks passed (below). The current build adds spending rules and freezing; its testnet redeploy, live run and the QCAI audit are next, and their results will replace the earlier ones here.
+> **Live on QoreChain testnet** at `0xD98320A95030874498b92e9cf66f95F83dDe47af`. The live run passed **21 of 21** checks with real ML-DSA-87 signatures: the whole flow, the spending rules and freezing, an independent off-chain check of a payment's signature, and six attacks refused. Details and explorer links: [`docs/TESTNET_RUN.md`](docs/TESTNET_RUN.md). Tests: 119 contract, 12 server, 27 app.
 
 ## Try it in two minutes
 
@@ -90,9 +90,23 @@ Full threat model: [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md).
 
 ## Proven on testnet
 
-The earlier build (source `cc4b416`, without spending rules) was deployed to `qorechain-diana` at `0x3A0039AC653f8876b8BEF5deBf56A0dAB5aaa2b3` and the live run passed **15 of 15** checks with real ML-DSA-87 signatures, including: a pot created and funded from the bank lane; a gas-free payment; a payee confirming with its own key; a new payee requested and approved; and six attacks refused (a stolen classical key opening a window, a call without the post-quantum signature, the attacker's own key, a replay, an unapproved payee, an amount changed after signing). A payment from that run was also verified independently in a browser: real signature valid, the same signature over a changed amount invalid.
+Contract `0xD98320A95030874498b92e9cf66f95F83dDe47af` on `qorechain-diana`, deployed from commit `da53d0a`; [`server/scripts/match-bytecode.ts`](server/scripts/match-bytecode.ts) shows the code on chain is exactly this source (QoreChain's explorer has no source verification yet). The live run, **21 of 21**:
 
-The current build's redeploy and run will be published in [`docs/TESTNET_RUN.md`](docs/TESTNET_RUN.md) with explorer links.
+| | Check | Result |
+|---|---|---|
+| ✓ | Funder creates a pot (cap 30 fUSD, 60 fUSD a week), signed with ML-DSA-87, checked by `pqcVerify` | [tx](https://explore.qore.network/tx/5AE33D0B8DF540B5F8E865E77B4788697B0B14C3D7EA1552C891838DE4BFD58D) |
+| ✓ | Funder pays 100 fUSD into the pot's address from the bank lane (`MsgConvertCoin`, hybrid-signed) | [tx](https://explore.qore.network/tx/47137D7E03B2CB46B45A5B6E464232DA32892A4DA40CC855BE6A7F9B2F10B35F) |
+| ✓ | The spender pays an approved shop 25 fUSD; no gas, no transaction of their own | [tx](https://explore.qore.network/tx/91C835422C9A539C72F7D827F86EC32D567198ABFCA87A9C8E9116646AACCE31) |
+| ✓ | The same payment checked off chain: statement and key from the chain, ML-DSA-87 verified; the signature over a changed amount fails | |
+| ✓ | The shop confirms its address with its own key; a new shop is requested, approved and paid | [tx](https://explore.qore.network/tx/148CB9609005DB44ED0F273408BFF059D1524F7FF71A94D7558288A88E037A2A) · [tx](https://explore.qore.network/tx/59BC9C036860C36E13D68757A75189D2FDC9C6FBE912D02B53B7060EA84DE67D) · [tx](https://explore.qore.network/tx/61B90D4B5127A37691A3577FC0AD5EC3EFBC943D2CDFB6BCCDA5979B9A72E0BE) |
+| ✓ | A stolen classical key can't open an EVM window: the chain requires the hybrid signature | refused by the chain |
+| ✓ | `addPayee` from the funder's own address without its post-quantum signature | [reverted on chain](https://explore.qore.network/tx/37C1E57DB0F981D06B6A693056673ABCD16F615197447CA0BAB06C66EB9D5D07) |
+| ✓ | The attacker's own registered key; a replay; an unapproved payee; an amount raised after signing | `BadPqcSignature`, `BadNonce`, `NotApproved`, `BadPqcSignature` |
+| ✓ | Over the per-payment cap; past the weekly limit (55 of 60 spent) | `OverPaymentLimit`, `OverPeriodLimit` |
+| ✓ | The funder freezes the pot; a signed payment from it is refused | [tx](https://explore.qore.network/tx/5C108471FC781D0EAE7F8D9583E8F19624F0E7F60C8258F8D547A97BF513D648), `PotFrozen` |
+| ✓ | After the end date, the rest goes back to the funder | [tx](https://explore.qore.network/tx/5A9A277BAD95A94BDEBC0A95BBFA0521939D7E21046F10D9E4EB1643A8B3CE45) |
+
+Explorer links: switch QoreChain's explorer to **Testnet** at the top of the page. All 21 steps, accounts and hashes: [`docs/TESTNET_RUN.md`](docs/TESTNET_RUN.md).
 
 ## Repository
 
@@ -135,7 +149,7 @@ On a server with Caddy, as root: `bash <(curl -fsSL https://raw.githubuserconten
 - **Contracts** (`forge test`, 119): creating pots, paying, payees, lifecycle, spending rules and freezing (with a fuzz over periods), the exact statement texts, the PQC checks (both precompile answer layouts, missing or odd precompiles, rotated keys, another chain) and 4 invariants (money accounted for, an attacker gets nothing, the contract holds nothing, paid ≤ funded).
 - **Server** (`vitest`, 12): what the relayer will and won't send, every contract error in plain words, a real ML-DSA-87 signature in QoreX's format, `MsgConvertCoin`, the deposit index, demo limits, and the history index against the contract on anvil.
 - **App** (`vitest`, 27): addresses, amounts and dates matching the contract; the QoreX adapter; the whole flow against the contract on anvil (create, fund, pay, confirm, request and approve, refusals, limits, freezing, a tampered statement that never reaches QoreX, release, reclaim); and **Verify** with a real ML-DSA-87 signature (valid) and one from a different key (invalid).
-- **Live** (`testnet:run`): the flow, the rules and six attacks against the chain's own precompiles.
+- **Live** (`testnet:run`): 21 checks against the chain's own precompiles: the flow, the rules and freezing, an off-chain signature check, and six attacks. Last run: 21 of 21 ([`docs/TESTNET_RUN.md`](docs/TESTNET_RUN.md)).
 
 Precompile stand-ins: anvil has no QoreChain precompiles, so local tests place stand-ins at `0x…0a01`/`0x…0a02`. Real ML-DSA-87 is checked by the server tests, the app's Verify test and the live run.
 

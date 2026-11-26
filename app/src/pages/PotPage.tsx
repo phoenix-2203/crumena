@@ -4,7 +4,7 @@ import { explain, type Payee, type Pot, type Rules } from "../lib/crumena";
 import { fundDemoPot } from "../lib/demo";
 import { parseUnits, printable, toEvm, toQor, units } from "../lib/format";
 import { transferToPot } from "../lib/qorex";
-import { verifyAction, type Verification } from "../lib/verify";
+import type { Verification } from "../lib/verify";
 import { useApp } from "../state";
 import { ActionButton, Address as Addr, ExplorerLink, Qr, money, potStatus, when } from "../ui";
 
@@ -523,7 +523,9 @@ function HistoryItem({ e, text }: { e: Entry; text: string }) {
               disabled={v === "busy"}
               onClick={() => {
                 setV("busy");
-                verifyAction(crumena!, e.tx as Hex).then(setV, (x) => setV((x as Error).message));
+                import("../lib/verify") // ML-DSA-87 code loads only when someone verifies
+                  .then(({ verifyAction }) => verifyAction(crumena!, e.tx as Hex))
+                  .then(setV, (x) => setV((x as Error).message));
               }}
             >
               {v === "busy" ? "Checking…" : "Verify"}

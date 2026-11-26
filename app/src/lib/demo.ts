@@ -3,7 +3,6 @@
  * registered ML-DSA-87 keys; their keys live in this browser only, and this signer signs exactly what
  * QoreX's signArbitrary would. Everything a demo person does is a real transaction on testnet.
  */
-import { classicalKeyFromPrivate, signMessage } from "@qorechain/qoresign";
 import { hexToBytes, type Address, type Hex } from "viem";
 import { CHAIN_ID, type Me, type Qorex } from "./qorex";
 
@@ -62,6 +61,7 @@ export function demoSigner(p: Persona): Qorex {
       getKey: async () => ({ algo: "ethsecp256k1", bech32Address: p.qor }),
       signArbitrary: async (_chain, signer, data) => {
         if (signer !== p.qor) throw new Error("Wrong demo person.");
+        const { classicalKeyFromPrivate, signMessage } = await import("@qorechain/qoresign"); // loaded only when a demo person signs
         const sig = signMessage({
           chainId: CHAIN_ID,
           signer: p.qor,

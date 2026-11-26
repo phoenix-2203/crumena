@@ -3,19 +3,47 @@ import { renderSVG } from "uqr";
 import { explain, type Pot } from "./lib/crumena";
 import { short, toQor, units } from "./lib/format";
 import { QOREX_INSTALL_URL } from "./lib/qorex";
-import { go, useApp } from "./state";
+import { go, useApp, useRoute } from "./state";
 
 export const EXPLORER = "https://explore.qore.network";
 
+const MARK = "M45.92,10.04 A26 26 0 1 0 57.4,26.43 L44.54,35.43 A13 13 0 1 1 33.07,19.04 Z";
+
+export function Mark({ className = "brand-mark" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 64 64" aria-hidden>
+      <path d={MARK} />
+    </svg>
+  );
+}
+
+/** Scrolls to a section of the home page, going home first if needed. */
+export function toSection(id: string) {
+  const scroll = () => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (window.location.hash.replace(/^#\/?/, "") === "") scroll();
+  else {
+    go("/");
+    setTimeout(scroll, 60);
+  }
+}
+
+const SECTIONS = [
+  ["How it works", "how"],
+  ["Security", "security"],
+  ["Proof", "proof"],
+] as const;
+
 export function Layout({ children }: { children: ReactNode }) {
   const { signer, demo, actAs, setDemo, connectQorex, signOut, toast } = useApp();
+  const [page] = useRoute();
   return (
     <>
       {demo && (
         <div className="demo-bar" role="region" aria-label="Demo">
           <div className="wrap">
-            <strong>Demo on QoreChain testnet.</strong>
-            <span>Act as:</span>
+            <span className="demo-dot" aria-hidden />
+            <span className="label">Demo · QoreChain testnet</span>
+            <span>Act as</span>
             {(["funder", "spender", "shop"] as const).map((r) => (
               <button key={r} aria-pressed={signer?.demo === r} onClick={() => actAs(r)}>
                 {r === "funder" ? "Funder" : r === "spender" ? "Spender" : "Vendor"}
@@ -26,47 +54,78 @@ export function Layout({ children }: { children: ReactNode }) {
           </div>
         </div>
       )}
-      <div className="wrap">
-        <header className="top">
+      <div className="top-shell">
+        <header className="wrap top">
           <a className="brand" href="#/">
-            <svg className="brand-mark" viewBox="0 0 64 64" aria-hidden>
-              <path d="M45.92,10.04 A26 26 0 1 0 57.4,26.43 L44.54,35.43 A13 13 0 1 1 33.07,19.04 Z" />
-            </svg>
+            <Mark />
             Crumena
           </a>
-          <nav className="nav">
+          <nav className="links" aria-label="Sections">
+            {SECTIONS.map(([label, id]) => (
+              <a key={id} href={`#/`} onClick={(e) => (e.preventDefault(), toSection(id))}>
+                {label}
+              </a>
+            ))}
+            <a href="#/demo" aria-current={page === "demo" ? "page" : undefined}>
+              Demo
+            </a>
+          </nav>
+          <nav className="nav" aria-label="Account">
             {signer && (
-              <a className="btn ghost small" href="#/pots">
+              <a className="btn ghost small" href="#/pots" aria-current={page === "pots" ? "page" : undefined}>
                 My pots
               </a>
             )}
             {signer && (
-              <a className="btn ghost small" href="#/new">
+              <a className="btn small" href="#/new">
                 New pot
               </a>
             )}
             {signer && !signer.demo && (
               <button className="btn ghost small" onClick={signOut} title={signer.me.qor}>
-                {short(signer.me.qor)} · Sign out
+                <span className="mono">{short(signer.me.qor)}</span> · Sign out
               </button>
             )}
             {!signer && (
-              <button className="btn small" onClick={() => connectQorex().then(() => go("/pots"), (e) => toast(explain(e)))}>
-                Connect QoreX
-              </button>
+              <>
+                <button className="btn ghost small" onClick={() => connectQorex().then(() => go("/pots"), (e) => toast(explain(e)))}>
+                  Connect QoreX
+                </button>
+                <a className="btn primary small" href="#/demo">
+                  Try the demo
+                </a>
+              </>
             )}
           </nav>
         </header>
-        <main>{children}</main>
-        <footer>
-          Crumena runs on QoreChain testnet. Every action is a plain-text statement signed with ML-DSA-87 and checked on chain by QoreChain's
-          pqcVerify precompile. Open source:{" "}
-          <a href="https://github.com/phoenix-2203/crumena" target="_blank" rel="noreferrer">
-            github.com/phoenix-2203/crumena
-          </a>
-          .
-        </footer>
       </div>
+      <main className="wrap">{children}</main>
+      <footer className="site">
+        <div className="wrap cols">
+          <div>
+            <a className="brand" href="#/">
+              <Mark />
+              Crumena
+            </a>
+            <p style={{ marginTop: 14 }}>
+              Money for one purpose, on QoreChain testnet. Every action is a plain-text statement signed with ML-DSA-87 and checked on chain by QoreChain's
+              pqcVerify precompile.
+            </p>
+          </div>
+          <nav aria-label="Footer">
+            <a href="#/demo">Demo</a>
+            <a href="https://github.com/phoenix-2203/crumena" target="_blank" rel="noreferrer">
+              Source on GitHub
+            </a>
+            <a href={EXPLORER} target="_blank" rel="noreferrer">
+              QoreChain explorer
+            </a>
+            <a href={QOREX_INSTALL_URL} target="_blank" rel="noreferrer">
+              Get QoreX
+            </a>
+          </nav>
+        </div>
+      </footer>
       <StatementModal />
       <Toast />
     </>

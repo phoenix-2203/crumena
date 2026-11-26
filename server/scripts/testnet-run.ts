@@ -211,9 +211,18 @@ const forgeText = await read<string>("addPayeeStatement", [potId, attacker.evm, 
 const c = await refused("addPayee", [potId, attacker.evm, "Totally legit", { nonce: n, validUntil: v, signature: attacker.signText(forgeText) }]);
 record("Attack: the funder's statement signed with the attacker's own registered ML-DSA-87 key", c === "BadPqcSignature", `refused: ${c}`);
 
-// d. Replay the spender's first payment.
-const d = await refused("pay", [potId, shopA.evm, 25n * FUSD_UNIT, "PO-1042 materials", spender.evm, { nonce: firstPayNonce, validUntil: payUntil, signature: paySig }]);
-record("Attack: replay the spender's signed payment", d === "BadNonce", `refused: ${d}`);
+// d. Replay the spender's first payment. The relayer answers a repeat of the same call with the first result and
+//    never sends it twice, so the replay also goes straight to the chain, from the attacker's own account.
+const replayArgs = [potId, shopA.evm, 25n * FUSD_UNIT, "PO-1042 materials", spender.evm, { nonce: firstPayNonce, validUntil: payUntil, signature: paySig }];
+const again = await relay("pay", replayArgs);
+record("Replay to the relayer: it returns the first payment and sends nothing new", again.hash === paid.hash, `answered with ${again.hash}`);
+let d: string | undefined;
+try {
+  await publicClient.call({ account: attacker.evm, to: CRUMENA, data: encodeFunctionData({ abi: CRUMENA_ABI, functionName: "pay", args: replayArgs as never }) });
+} catch (e) {
+  d = revertName(e);
+}
+record("Attack: replay the spender's signed payment straight to the chain", d === "BadNonce", `refused: ${d}`);
 
 // e. A real signature from the spender, but to an address that isn't approved.
 n = await nonce(spender);

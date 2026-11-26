@@ -2,7 +2,7 @@
 
 ## What is protected
 
-The money in each pot, and the funder's rules for it: who spends it, which payees it may pay, how much per payment and per period, whether it is frozen, and when the rest goes back.
+The money in each pot, and the funder's rules for it: who spends it, which payees it may pay and how much each may receive in total, how much per payment and per period, whether it is frozen, and when the rest goes back.
 
 ## Trust assumptions
 
@@ -21,7 +21,7 @@ Nothing else is trusted: not the relayer, the server, the app's host, or whoever
 | **The relayer** | refuse or delay | Liveness only, no loss of funds. Anyone can submit a signed action from any account. After the end date, anyone can return the rest to the funder. |
 | **A tampered server or app host** | get someone to sign something else | The text shown in QoreX is what gets signed, and it names the action, pot, amount, payee address, signer, nonce, deadline, contract and chain. The app also checks the statement line by line against what the person asked for before handing it to QoreX (tested in `app/test/flow.test.ts`). |
 | **Replay** | reuse a signature | Nonces are per signer and must be the next one in order. Signatures expire (at most 7 days ahead, and the app asks for 30 minutes). Statements name the contract and the chain, and the constructor checks `block.chainid`. |
-| **The spender** | pay someone not approved, overspend, or keep the money | `pay` only reaches approved payees (and only confirmed ones if the pot requires it), never above the cap per payment or the limit per period, and never from a frozen pot. The funder, the spender, pot vaults and the contract itself can't be made payees. Asking for a new payee does nothing until the funder signs its approval. |
+| **The spender** | pay someone not approved, overspend, or keep the money | `pay` only reaches approved payees (and only confirmed ones if the pot requires it), never above the cap per payment, the limit per period or the payee's own amount, and never from a frozen pot. What each payee was paid is counted by the contract and survives removing and re-approving it, so that can't reset its amount. The funder, the spender, pot vaults and the contract itself can't be made payees. Asking for a new payee does nothing until the funder signs its approval, at an amount the funder chooses; the amount the spender asked for is only a request. |
 | **A thief with the spender's phone** | drain the pot | Payments stay within the limits and go only to approved payees; the funder freezes the pot with one signed statement. |
 | **The funder** | take the money back early | There is no early withdrawal: before the end date the funder can only approve or remove payees, change limits, freeze, extend the end date, or release everything to the spender. The end date can only move later. Freezing stops payments but doesn't move money. |
 | **A payee** | be paid without being approved | Confirming an address only marks an already-approved payee as confirmed. It approves nothing. |
@@ -29,6 +29,8 @@ Nothing else is trusted: not the relayer, the server, the app's host, or whoever
 | **Front-running a signed action** | change its effect | Submitting someone else's signed action has exactly the effect they signed. Each pot's vault comes from CREATE2 with salt `(funder, nonce)`, and the funder's statement shows its address before signing. |
 | **Crumena's server shows a false history** | hide or invent payments | Balances, limits and payees are read from the contract. **Verify** checks any history entry against the chain directly: the transaction, the statement as of the block before, the key on record at that block, and the ML-DSA-87 signature, all in the browser. |
 | **Abuse of the demo** | drain the relayer's test funds | Demo people are rate-limited per visitor and per day; each gets just enough test QOR to register a key, and a demo pot gets 50 test fUSD once. Demo keys are throwaway testnet keys kept in that browser. |
+| **Abuse of the public challenge** | drain the challenge pot, or the relayer | The challenge's keys are throwaway testnet keys held by the server. Misuse attempts are only run against the contract (no transaction is sent), so they cost nothing; the one real action is a 0.01 fUSD payment to the pot's own approved payee, rate-limited per visitor (5 an hour, 40 tries an hour). If the contract ever accepted an attack, the server would report it and not send it. |
+| **Guessing pot links** | find pots by counting | Links use a code from the pot's vault address instead of its number. This is convenience, not secrecy: everything about a pot is public on chain. |
 | **Spam against the relayer's gas** | drain the relayer | The relayer simulates each call first and sends only calls to the Crumena contract that would succeed. It rate-limits by IP and only opens windows scoped to the Crumena contract. |
 
 ## Residual risks
@@ -46,4 +48,5 @@ Nothing else is trusted: not the relayer, the server, the app's host, or whoever
 - `contracts/test/`: unit, fuzz and invariant tests, including wrong keys, an attacker's own key, replays, other chains, both `pqcKeyStatus` answer layouts and missing precompiles.
 - `server/test/`: a real ML-DSA-87 signature in QoreX's exact format.
 - `app/test/flow.test.ts`: the full flow against the contract, including a tampered statement that is never shown to QoreX.
-- `server/scripts/testnet-run.ts`: the same flow and six attacks against the chain's own precompiles. Results are added to `docs/` after the run.
+- `server/test/challenge.test.ts`: each public-challenge attack's exact call, that none is sent, and a would-be accept reported plainly.
+- `server/scripts/testnet-run.ts`: the same flow, the payee amounts and six attacks against the chain's own precompiles. Results are added to `docs/` after the run.

@@ -1,6 +1,6 @@
 # Crumena
 
-**Money for one purpose. Fill a pot for someone; they spend it only with the people you approve, within the limits you set; whatever is left comes back to you. Every step is a plain sentence signed with a post-quantum key and checked on chain.**
+**Money for one purpose. Fill a pot for someone; they pay only the payees you approve, each up to the amount you set, within your caps; whatever is left comes back to you. Every step is a plain sentence signed with a post-quantum key and checked on chain.**
 
 A *crumena* was the Roman purse you carried for a purpose. Crumena makes that purse programmable on QoreChain: the funder, the spender and the payees each sign readable statements in QoreX with their **ML-DSA-87** key, and the contract checks every one with QoreChain's `pqcVerify` precompile against the key the chain has on record.
 
@@ -10,14 +10,16 @@ Built for QoreChain's *Build Before Q-Day* fest, Post-Quantum dApp track.
 
 ## Try it in two minutes
 
-Open the app and press **Try it in two minutes**. You get three test people on QoreChain testnet (a funder, a spender and a vendor), each with a real ML-DSA-87 key registered on chain. Switch between them at the top of the page:
+Open the app and press **Try it in two minutes**. You get three test people on QoreChain testnet (a funder, a spender and a payee), each with a real ML-DSA-87 key registered on chain. Switch between them at the top of the page; a **Start here** guide ticks off each step:
 
-1. **As the funder,** create a pot (the form is filled in for you), read the exact text you're signing, sign it, and add 50 test fUSD.
-2. **As the spender,** pay the vendor. Then try paying more than the cap: the contract refuses.
-3. **As the vendor,** confirm the address is yours, with your own key.
-4. **As the funder,** freeze the pot, change the limits, or give the rest to the spender. Press **Verify** on any payment to check its signature yourself.
+1. **As the funder,** create a pot (the form is filled in for you, the payee approved up to 30 fUSD), read the exact text you're signing, sign it, and add 50 test fUSD.
+2. **As the spender,** pay the payee. Then try paying more than the cap or the payee's amount: the contract refuses. Need someone new? Ask the funder, with the amount you need.
+3. **As the payee,** confirm the address is yours, with your own key.
+4. **As the funder,** approve a request for an amount of your choice, change a payee's limit, freeze the pot, or give the rest to the spender. Open any payment's **receipt**, or press **Verify**, to check its signature yourself.
 
 No wallet, no sign-up, no gas. With QoreX it's the same, with your own account.
+
+Or go straight to **Make this pot misbehave** on the home page: a public pot on testnet where you play the spender and try eight ways to misuse the money. The live contract refuses each one, with its reason; one honest payment goes through, with a receipt.
 
 ## Who it's for
 
@@ -25,9 +27,9 @@ Money given for a purpose often isn't spent on it: a budget handed to someone el
 
 | Role | Can | Can't |
 |---|---|---|
-| **Funder** | create a pot; approve or remove payees; set a cap per payment and a limit per day, week or month; **freeze** the pot at once; extend the end date; release the rest to the spender | take the money back before the end date, or pay anyone not approved |
-| **Spender** | pay approved payees within the limits; ask the funder to approve someone new | pay anyone else, go over a limit, or keep the money |
-| **Payee** | confirm with its own key that the address is theirs (a pot can require this) | anything else |
+| **Funder** | create a pot; approve or remove payees, **each up to an amount**, and change a payee's amount; set a cap per payment and a limit per day, week or month; **freeze** the pot at once; extend the end date; release the rest to the spender | take the money back before the end date, or pay anyone not approved |
+| **Spender** | pay approved payees within the limits; ask the funder to approve someone new, **with the amount needed** | pay anyone else, go over a limit or a payee's amount, or keep the money |
+| **Payee** (a vendor, a supplier, a landlord, a service) | receive payments, each with a receipt; confirm with its own key that the address is theirs (a pot can require this) | receive more than the funder approved for it |
 | **Anyone** | pay into a pot's own address; after the end date, send what's left back to the funder | send it anywhere else |
 
 ## How it works
@@ -61,6 +63,9 @@ Money given for a purpose often isn't spent on it: a budget handed to someone el
 - **The relayer can't act on its own.** It submits from an EVM window scoped to the Crumena contract only; every call is authorised inside the contract by someone else's post-quantum signature. The one unsigned call, `reclaim`, can only send money back to the funder.
 - **Anyone can check.** Each history entry has **Verify**: the browser reads the transaction, asks the contract (as of the block before) for the statement, reads the signer's key from `pqcKeyStatus` at that block, and checks the ML-DSA-87 signature itself. No trust in Crumena's server.
 - **Each pot has its own address** (a CREATE2 vault), shown in the funder's statement before signing. Anyone can pay in: an ERC-20 transfer, or straight from the bank lane with `MsgConvertCoin`.
+- **Each payee has an amount.** The funder approves a payee up to an amount in total (`Up to: 30 fUSD in total`), in the create statement or later; the spender's request for a new payee carries the amount it needs (`Amount: 15 fUSD`), and the funder approves that or an amount of its choice. The contract counts what each payee was paid, across removal and re-approval, and refuses past it (`OverPayeeLimit`).
+- **Receipts.** Every payment has a page (`#/r/<pot>/<transaction>`) with the amount, payee, signer, memo, time, the signed statement and the same in-browser signature check as **Verify**; print it or save it as PDF.
+- **Short links.** A pot opens at `#/p/<code>`: 11 characters from the first 8 bytes of its vault, mapped on chain (`potOfCode`) and checked against the vault. Not secret (a pot is public on chain), just not a counter.
 
 ## QoreChain features used
 
@@ -79,8 +84,8 @@ QoreChain's AI risk precompiles (`0x…0b01`, `0x…0b02`) were checked too: on 
 
 ## Security properties
 
-- Only the funder's key can create a pot, approve or remove payees, set limits, freeze, extend or release. Only the spender (or funder) can pay, only to approved payees, only within the limits, and never from a frozen pot.
-- Limits hold across any spread of payments: a fuzz test checks no period ever pays out more than its limit.
+- Only the funder's key can create a pot, approve or remove payees, set limits (per payment, per period, per payee), freeze, extend or release. Only the spender (or funder) can pay, only to approved payees, only within the limits, and never from a frozen pot.
+- Limits hold across any spread of payments: fuzz tests check no period ever pays out more than its limit and no payee ever receives more than its amount, and an invariant checks each payee's count matches what it received.
 - Statements are printable ASCII only (no line breaks, no look-alike letters) with length caps; addresses always sit on their own line.
 - Nonces are per signer and sequential; signatures expire (at most 7 days; the app asks for 30 minutes). Statements name the contract and the chain, and the constructor checks `block.chainid`.
 - The app refuses to pass QoreX a statement whose lines don't match the request (tested with a tampered server), and refuses if QoreX switched account since sign-in.
@@ -112,7 +117,7 @@ Explorer links: switch QoreChain's explorer to **Testnet** at the top of the pag
 
 ```
 contracts/   Foundry: Crumena.sol, PotVault.sol, lib/Pqc.sol, lib/Text.sol; tests: unit, fuzz, invariants
-server/      relayer, read-only RPC/REST proxy, pot history and bank-deposit indexes, demo people (Hono)
+server/      relayer, read-only RPC/REST proxy, pot history and bank-deposit indexes, demo people, the public challenge pot (Hono)
              scripts/: deploy, live testnet run, relayer account
 app/         web app (Vite + React): QoreX adapter, demo signer, contract client, browser verification, screens
              e2e/: the whole app on a local chain, and a scripted click-through
@@ -146,9 +151,10 @@ On a server with Caddy, as root: `bash <(curl -fsSL https://raw.githubuserconten
 
 ## Tests
 
-- **Contracts** (`forge test`, 137): creating pots, paying, payees, lifecycle, spending rules and freezing (with a fuzz over periods), the exact statement texts, the PQC checks (both precompile answer layouts, missing or odd precompiles, rotated keys, another chain), 4 invariants (money accounted for, an attacker gets nothing, the contract holds nothing, paid ≤ funded), and a regression test for each QCAI finding.
-- **Server** (`vitest`, 12): what the relayer will and won't send, every contract error in plain words, a real ML-DSA-87 signature in QoreX's format, `MsgConvertCoin`, the deposit index, demo limits, and the history index against the contract on anvil.
-- **App** (`vitest`, 27): addresses, amounts and dates matching the contract; the QoreX adapter; the whole flow against the contract on anvil (create, fund, pay, confirm, request and approve, refusals, limits, freezing, a tampered statement that never reaches QoreX, release, reclaim); and **Verify** with a real ML-DSA-87 signature (valid) and one from a different key (invalid).
+- **Contracts** (`forge test`, 161): creating pots, paying, payees and their amounts (with a fuzz that no payee ever gets more than its amount), requests with amounts, link codes, lifecycle, spending rules and freezing (with a fuzz over periods), the exact statement texts, the PQC checks (both precompile answer layouts, missing or odd precompiles, rotated keys, another chain), 5 invariants (money accounted for, each payee's count exact and within its amount, an attacker gets nothing, the contract holds nothing, paid ≤ funded), and a regression test for each QCAI finding.
+- **Server** (`vitest`, 19): what the relayer will and won't send, every contract error in plain words, a real ML-DSA-87 signature in QoreX's format, `MsgConvertCoin`, the deposit index, demo limits, the history index against the contract on anvil, and the public challenge (each attack's exact call, never sent; a would-be accept reported plainly; replay after a restart).
+- **App** (`vitest`, 28): addresses, amounts and dates matching the contract; the QoreX adapter; the whole flow against the contract on anvil (create, fund, pay, confirm, request with an amount and approve a different one, the payee's amount enforced and raised, refusals, limits, freezing, a tampered statement that never reaches QoreX, short link codes, release, reclaim); and **Verify** with a real ML-DSA-87 signature on create, approve and limit changes (valid) and one from a different key (invalid).
+- **Browser** (`app/e2e`): the scripted click-through of the demo, up to a receipt and the Start here guide at 4 of 4, and an accessibility check (axe-core, WCAG 2.1 AA) of every page in light and dark.
 - **Live** (`testnet:run`): 21 checks against the chain's own precompiles: the flow, the rules and freezing, an off-chain signature check, and six attacks. Last run: 21 of 21 ([`docs/TESTNET_RUN.md`](docs/TESTNET_RUN.md)).
 
 Precompile stand-ins: anvil has no QoreChain precompiles, so local tests place stand-ins at `0x…0a01`/`0x…0a02`. Real ML-DSA-87 is checked by the server tests, the app's Verify test and the live run.

@@ -14,6 +14,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { getAddress, type Hex } from "viem";
 import { CHAIN_ID, EVM_CHAIN_ID, EVM_RPC, FUSD, REST, bankBalance, cosmosHashOf, hasPqcKey, publicClient, registerPqcKey, useAccount } from "./chain";
 import { createActivityIndex } from "./activity";
+import { ATTACKS, createChallenge, type Attack } from "./challenge";
 import { createDemo } from "./demo";
 import { createDepositIndex } from "./deposits";
 import { RelayError, createRelayer } from "./relay";
@@ -54,6 +55,7 @@ void (async () => {
         await new Promise((r) => setTimeout(r, 3000));
       }
       relayerReady = true;
+      void setUpChallenge();
       return;
     } catch (e) {
       console.log(`relayer key not registered yet (fund ${account.qor} with test QOR): ${(e as Error).message}`);
@@ -62,6 +64,19 @@ void (async () => {
   }
 })();
 const notReady = { error: "The relayer is still setting up (it needs test QOR for its first transaction). Try again in a minute." };
+
+// The public challenge pot ("make this pot misbehave"), set up once the relayer can sign.
+const challenge = createChallenge({ relayer: account, crumena: CRUMENA, relay: relayer.relay, simulate: relayer.simulate, exclusive: relayer.exclusive });
+async function setUpChallenge() {
+  for (let i = 0; i < 20 && !challenge.isSetUp(); i++) {
+    try {
+      await challenge.setup();
+    } catch (e) {
+      console.log(`challenge setup failed, retrying in a minute: ${(e as Error).message}`);
+      await new Promise((r) => setTimeout(r, 60_000));
+    }
+  }
+}
 
 const demo = createDemo({ relayer: account, crumena: CRUMENA, exclusive: relayer.exclusive });
 const clientIp = (h: (n: string) => string | undefined) => h("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
@@ -104,6 +119,33 @@ app.post("/api/relay", async (c) => {
     if (e instanceof RelayError) return c.json({ error: e.message, reason: e.reason }, e.status);
     console.error(e);
     return c.json({ error: "The relayer couldn't send it. Try again in a moment." }, 503);
+  }
+});
+
+// "Make this pot misbehave": tries are run against the live contract; refused ones cost nothing.
+const tries = new Map<string, number[]>();
+function tooMany(ip: string, perHour: number, key: string): boolean {
+  const now = Date.now();
+  const list = (tries.get(key + ip) ?? []).filter((t) => now - t < 3_600_000);
+  if (list.length >= perHour) return true;
+  list.push(now);
+  tries.set(key + ip, list);
+  return false;
+}
+app.get("/api/challenge", async (c) => c.json(await challenge.state().catch(() => ({ ready: false }))));
+app.post("/api/challenge/:attack", async (c) => {
+  if (!relayerReady || !challenge.isSetUp()) return c.json({ error: "The challenge pot is still being set up. Try again in a minute." }, 503);
+  const attack = c.req.param("attack");
+  const ip = clientIp((n) => c.req.header(n));
+  const honest = attack === "honest";
+  if (!honest && !(attack in ATTACKS)) return c.json({ error: "Unknown attack." }, 400);
+  if (tooMany(ip, honest ? 5 : 40, honest ? "h:" : "a:")) return c.json({ error: honest ? "That's enough honest payments for this hour." : "That's a lot of tries for one hour. Come back later." }, 429);
+  try {
+    return c.json(honest ? await challenge.honest() : await challenge.attempt(attack as Attack));
+  } catch (e) {
+    if (e instanceof RelayError) return c.json({ error: e.message, reason: e.reason }, e.status);
+    console.error(e);
+    return c.json({ error: "Couldn't reach the chain just now. Try again in a moment." }, 503);
   }
 });
 

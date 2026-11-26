@@ -5,3 +5,4 @@ dist/
 !.env.example
 *.db
 drill-results/
+server/data/

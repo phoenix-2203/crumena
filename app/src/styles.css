@@ -60,7 +60,7 @@ p { margin: 0 0 0.8em; }
 .wrap { max-width: 1040px; margin: 0 auto; padding: 0 20px; }
 .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 0; }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.15rem; color: var(--ink); text-decoration: none; }
-.brand-mark { width: 28px; height: 28px; border-radius: 9px; background: var(--accent); display: grid; place-items: center; color: var(--accent-ink); font-size: 15px; }
+.brand-mark { width: 26px; height: 26px; fill: var(--accent); flex: none; }
 .nav { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
 .demo-bar { background: #15171b; color: #f8f6f1; font-size: 0.9rem; }

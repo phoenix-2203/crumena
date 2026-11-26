@@ -29,9 +29,9 @@ export function Layout({ children }: { children: ReactNode }) {
       <div className="wrap">
         <header className="top">
           <a className="brand" href="#/">
-            <span className="brand-mark" aria-hidden>
-              C
-            </span>
+            <svg className="brand-mark" viewBox="0 0 64 64" aria-hidden>
+              <path d="M45.92,10.04 A26 26 0 1 0 57.4,26.43 L44.54,35.43 A13 13 0 1 1 33.07,19.04 Z" />
+            </svg>
             Crumena
           </a>
           <nav className="nav">

@@ -4,6 +4,7 @@ import { short } from "../lib/format";
 import { QOREX_INSTALL_URL } from "../lib/qorex";
 import { go, useApp } from "../state";
 import { EXPLORER, ExplorerLink, Mark } from "../ui";
+import { Challenge } from "./Challenge";
 
 const STEPS = [
   ["Fill a pot", "Say what it's for, who spends it, who can be paid and how much, and the limits. Then pay into the pot's own address."],
@@ -81,7 +82,10 @@ export function Home() {
             </span>
           </span>
           <h1>
-            Money for <span className="line">one purpose.</span>
+            Money for{" "}
+            <span className="line">
+              <span>one purpose.</span>
+            </span>
           </h1>
           <p className="lead">
             Fill a pot for someone. They pay only the payees you approve, up to the amounts you set. Whatever is left comes back to you.
@@ -131,6 +135,8 @@ export function Home() {
           </div>
         </section>
       )}
+
+      <Challenge />
 
       <section id="how" className="section">
         <div className="section-head">

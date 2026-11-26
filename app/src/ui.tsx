@@ -28,6 +28,7 @@ export function toSection(id: string) {
 }
 
 const SECTIONS = [
+  ["Try to break it", "challenge"],
   ["How it works", "how"],
   ["Who's who", "roles"],
   ["Security", "security"],

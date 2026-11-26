@@ -6,6 +6,7 @@ import { NewPot } from "./pages/NewPot";
 import { PotPage } from "./pages/PotPage";
 import { Pots } from "./pages/Pots";
 import { AppProvider, useApp, useRoute } from "./state";
+import "./fonts";
 import "./styles.css";
 import { Layout } from "./ui";
 

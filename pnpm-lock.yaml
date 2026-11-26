@@ -10,6 +10,9 @@ importers:
 
   app:
     dependencies:
+      '@qorechain/qoresign':
+        specifier: 0.2.0
+        version: 0.2.0
       '@scure/base':
         specifier: ^2.4.0
         version: 2.4.0

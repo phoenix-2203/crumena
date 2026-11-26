@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@qorechain/qoresign": "0.2.0",
     "@scure/base": "^2.4.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",

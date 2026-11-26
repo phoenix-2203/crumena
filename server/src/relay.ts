@@ -16,7 +16,7 @@ import { explainError } from "../../shared/errors";
 import { MAX_FEE_PER_GAS, PRIORITY_FEE, publicClient, type Account } from "./chain";
 
 /** The functions the relayer sends. Each is authorised inside the contract by a signature (reclaim needs none: its money only goes to the funder). */
-export const RELAYED = ["createPot", "pay", "addPayee", "removePayee", "requestPayee", "confirmPayee", "extend", "release", "reclaim"] as const;
+export const RELAYED = ["createPot", "pay", "addPayee", "removePayee", "requestPayee", "confirmPayee", "extend", "setRules", "setFrozen", "release", "reclaim"] as const;
 export type Relayed = (typeof RELAYED)[number];
 
 const WINDOW_TXS = 40;

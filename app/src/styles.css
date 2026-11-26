@@ -514,11 +514,11 @@ footer.site a:hover { color: var(--ink); }
 .cline-what { color: #ecebe6; font-family: var(--sans); font-size: 0.92rem; }
 .cline-why { color: #b9b6ae; font-family: var(--sans); font-size: 0.88rem; margin-top: 3px; }
 .cline-why code { font-family: var(--mono); color: #f3bd8e; }
-.cline-meta { color: #75726b; margin-top: 4px; }
+.cline-meta { color: #8f8c85; margin-top: 4px; }
 .cline-meta a { color: #e39a62; }
 .cline details { margin-top: 6px; color: #8d8a83; }
 .cline summary { cursor: pointer; }
 .cline pre { white-space: pre-wrap; word-break: break-all; color: #cfcbc2; margin: 8px 0 0; font-size: 0.74rem; line-height: 1.6; }
 .challenge-note { color: #b9b6ae; margin-top: 28px; }
-.challenge-foot { color: #75726b; font-size: 0.8rem; margin: 26px 0 0; max-width: 900px; }
+.challenge-foot { color: #8f8c85; font-size: 0.8rem; margin: 26px 0 0; max-width: 900px; }
 @media (max-width: 960px) { .challenge { padding: 40px 22px 26px; } .challenge-body { grid-template-columns: 1fr; } .console { position: static; min-height: 0; } }

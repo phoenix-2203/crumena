@@ -26,6 +26,8 @@ id crumena >/dev/null 2>&1 || useradd --system --home "$DIR" --shell /usr/sbin/n
 if [ ! -d "$DIR/.git" ]; then
   git clone https://github.com/phoenix-2203/crumena "$DIR"
 else
+  # The folder belongs to the service user; let root's git update it.
+  git config --global --get-all safe.directory | grep -qxF "$DIR" || git config --global --add safe.directory "$DIR"
   git -C "$DIR" pull --ff-only
 fi
 

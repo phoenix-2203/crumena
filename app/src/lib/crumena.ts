@@ -56,6 +56,12 @@ export interface Payee {
   confirmed: boolean;
   requested: boolean;
   name: string;
+  /** Most the pot may pay this payee in total; 0 means no limit beyond the pot's rules. */
+  limit: bigint;
+  /** Paid to this payee so far, by this pot. */
+  paid: bigint;
+  /** The amount the spender asked for when requesting this payee (0 once settled). */
+  asked: bigint;
 }
 export interface NewPot {
   funder: Address;
@@ -67,6 +73,8 @@ export interface NewPot {
   purpose: string;
   payees: Address[];
   names: string[];
+  /** Per payee, most it may receive in total; 0 means no limit. */
+  limits: bigint[];
 }
 export interface Sent {
   hash: Hex;
@@ -140,6 +148,14 @@ export function createCrumena(config: Config, opts: Options = {}) {
     return { decimals, symbol };
   }
 
+  /** The pot behind a short link code (the first 8 bytes of its vault), checked against that vault. */
+  async function potByCode(code: Hex): Promise<bigint | undefined> {
+    const id = await read<bigint>("potOfCode", [code]);
+    if (id === 0n) return undefined;
+    const p = await read<{ vault: Address }>("potInfo", [id]);
+    return p.vault.toLowerCase().startsWith(code.toLowerCase()) ? id : undefined;
+  }
+
   /** Every pot an account funds, spends, or is a payee of, newest first. */
   async function potsOf(account: Address): Promise<Pot[]> {
     const ids = await read<bigint[]>("potsOf", [account]);
@@ -187,6 +203,7 @@ export function createCrumena(config: Config, opts: Options = {}) {
   }
 
   const amountLine = (amount: bigint, p: Pot) => `Amount: ${units(amount, p.decimals)} ${p.symbol}`;
+  const upToLine = (limit: bigint, p: Pot) => `Up to: ${limit === 0n ? "no limit" : `${units(limit, p.decimals)} ${p.symbol} in total`}`;
 
   return {
     config,
@@ -195,6 +212,7 @@ export function createCrumena(config: Config, opts: Options = {}) {
     pot,
     payees,
     potsOf,
+    potByCode,
     periodSpending,
     tokenInfo,
     nonceOf: (a: Address) => read<bigint>("nonceOf", [a]),
@@ -209,7 +227,7 @@ export function createCrumena(config: Config, opts: Options = {}) {
         `Ends: ${utc(p.endsAt)}`,
         `Pay only payees who confirmed: ${p.confirmedOnly ? "yes" : "no"}`,
         ...rulesLines(p.rules, t.decimals, t.symbol),
-        ...p.payees.map((x, i) => `${i + 1}. ${p.names[i]}, ${x.toLowerCase()}`),
+        ...p.payees.map((x, i) => `${i + 1}. ${p.names[i]}, ${x.toLowerCase()}${payeeLimitText(p.limits[i] ?? 0n, t.decimals, t.symbol)}`),
       ]);
     },
 
@@ -221,11 +239,19 @@ export function createCrumena(config: Config, opts: Options = {}) {
         `Memo: ${memo || "-"}`,
       ]),
 
-    addPayee: (q: Qorex, me: Me, p: Pot, payee: Address, name: string) =>
-      signed(q, me, p.funder, "addPayeeStatement", (n, v) => [p.id, payee, name, n, v], "addPayee", (a) => [p.id, payee, name, a], [
+    addPayee: (q: Qorex, me: Me, p: Pot, payee: Address, name: string, limit: bigint) =>
+      signed(q, me, p.funder, "addPayeeStatement", (n, v) => [p.id, payee, name, limit, n, v], "addPayee", (a) => [p.id, payee, name, limit, a], [
         `Crumena: approve a payee for pot #${p.id}`,
         `Payee: ${name}`,
         `Address: ${payee.toLowerCase()}`,
+        upToLine(limit, p),
+      ]),
+
+    setPayeeLimit: (q: Qorex, me: Me, p: Pot, payee: Address, limit: bigint) =>
+      signed(q, me, p.funder, "payeeLimitStatement", (n, v) => [p.id, payee, limit, n, v], "setPayeeLimit", (a) => [p.id, payee, limit, a], [
+        `Crumena: change what pot #${p.id} may pay a payee`,
+        `Address: ${payee.toLowerCase()}`,
+        upToLine(limit, p),
       ]),
 
     removePayee: (q: Qorex, me: Me, p: Pot, payee: Address) =>
@@ -234,11 +260,12 @@ export function createCrumena(config: Config, opts: Options = {}) {
         `Address: ${payee.toLowerCase()}`,
       ]),
 
-    requestPayee: (q: Qorex, me: Me, p: Pot, payee: Address, name: string) =>
-      signed(q, me, p.recipient, "requestPayeeStatement", (n, v) => [p.id, payee, name, n, v], "requestPayee", (a) => [p.id, payee, name, a], [
+    requestPayee: (q: Qorex, me: Me, p: Pot, payee: Address, name: string, amount: bigint) =>
+      signed(q, me, p.recipient, "requestPayeeStatement", (n, v) => [p.id, payee, name, amount, n, v], "requestPayee", (a) => [p.id, payee, name, amount, a], [
         `Crumena: ask the funder to approve a payee for pot #${p.id}`,
         `Payee: ${name}`,
         `Address: ${payee.toLowerCase()}`,
+        amountLine(amount, p),
       ]),
 
     confirmPayee: (q: Qorex, me: Me, p: Pot) =>
@@ -278,6 +305,11 @@ export function createCrumena(config: Config, opts: Options = {}) {
 }
 
 export type Crumena = ReturnType<typeof createCrumena>;
+
+/** How a payee's limit ends its line in the create statement, exactly as the contract writes it. */
+export function payeeLimitText(limit: bigint, decimals: number, symbol: string): string {
+  return limit === 0n ? ", no limit" : `, up to ${units(limit, decimals)} ${symbol}`;
+}
 
 /** The two rules lines exactly as the contract writes them. */
 export function rulesLines(r: Rules, decimals: number, symbol: string): [string, string] {

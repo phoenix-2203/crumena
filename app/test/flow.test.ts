@@ -180,6 +180,7 @@ describe.skipIf(!ready)("the app against the real contract (local chain)", () =>
       purpose: "Office fit-out, phase 1",
       payees: [shopAcct.address],
       names: ["Halden Building Supplies"],
+      limits: [0n],
     });
     pot = await app.pot(BigInt(sent.potId!));
     expect(pot.vault).toBe(predicted);
@@ -200,15 +201,34 @@ describe.skipIf(!ready)("the app against the real contract (local chain)", () =>
 
   it("the shop confirms its address; a new shop is requested, approved, and paid", async () => {
     await app.confirmPayee(fakeQorex(shopAcct, seen), meOf(shopAcct), pot);
-    await app.requestPayee(fakeQorex(spenderAcct, seen), meOf(spenderAcct), pot, otherAcct.address, "Brightline Electrical");
+    await app.requestPayee(fakeQorex(spenderAcct, seen), meOf(spenderAcct), pot, otherAcct.address, "Brightline Electrical", 15n * FUSD);
+    expect(seen.at(-1)).toContain("\nAmount: 15 fUSD\n");
     let list = await app.payees(pot.id);
     expect(list.find((p) => p.address === shopAcct.address)).toMatchObject({ approved: true, confirmed: true });
-    expect(list.find((p) => p.address === otherAcct.address)).toMatchObject({ approved: false, requested: true });
+    expect(list.find((p) => p.address === otherAcct.address)).toMatchObject({ approved: false, requested: true, asked: 15n * FUSD });
 
-    await app.addPayee(fakeQorex(funderAcct, seen), meOf(funderAcct), pot, otherAcct.address, "Brightline Electrical");
+    // the funder approves a smaller amount of its choice
+    await app.addPayee(fakeQorex(funderAcct, seen), meOf(funderAcct), pot, otherAcct.address, "Brightline Electrical", 12n * FUSD);
+    expect(seen.at(-1)).toContain("\nUp to: 12 fUSD in total\n");
     await app.pay(fakeQorex(spenderAcct, seen), meOf(spenderAcct), pot, otherAcct.address, 10n * FUSD, "");
     expect(await fusdOf(otherAcct.address)).toBe(10n * FUSD);
     expect(seen.at(-1)).toContain("Memo: -");
+    await expect(app.pay(fakeQorex(spenderAcct, seen), meOf(spenderAcct), pot, otherAcct.address, 3n * FUSD, "")).rejects.toSatisfy(
+      (e) => explain(e).startsWith("That's more than the funder approved for this payee"),
+    );
+    list = await app.payees(pot.id);
+    expect(list.find((p) => p.address === otherAcct.address)).toMatchObject({ approved: true, limit: 12n * FUSD, paid: 10n * FUSD, asked: 0n });
+
+    // and raises it
+    await app.setPayeeLimit(fakeQorex(funderAcct, seen), meOf(funderAcct), pot, otherAcct.address, 20n * FUSD);
+    expect(seen.at(-1)).toContain("\nUp to: 20 fUSD in total\nAlready paid: 10 fUSD\n");
+    await app.pay(fakeQorex(spenderAcct, seen), meOf(spenderAcct), pot, otherAcct.address, 3n * FUSD, "");
+    expect(await fusdOf(otherAcct.address)).toBe(13n * FUSD);
+  });
+
+  it("a short link code finds its pot, and a wrong code finds nothing", async () => {
+    expect(await app.potByCode(pot.vault.slice(0, 18) as `0x${string}`)).toBe(pot.id);
+    expect(await app.potByCode("0x0000000000000000")).toBeUndefined();
   });
 
   it("refuses an unapproved payee with a plain message from the contract's reason", async () => {
@@ -230,7 +250,7 @@ describe.skipIf(!ready)("the app against the real contract (local chain)", () =>
   });
 
   it("refuses to sign with the wrong account before anything reaches QoreX", async () => {
-    await expect(app.addPayee(fakeQorex(spenderAcct, seen), meOf(spenderAcct), pot, relayerAcct.address, "Nope")).rejects.toThrow(/different account/);
+    await expect(app.addPayee(fakeQorex(spenderAcct, seen), meOf(spenderAcct), pot, relayerAcct.address, "Nope", 0n)).rejects.toThrow(/different account/);
   });
 
   it("the funder sets a weekly limit and freezes the pot; both are enforced", async () => {
@@ -253,7 +273,7 @@ describe.skipIf(!ready)("the app against the real contract (local chain)", () =>
     expect((await app.pot(pot.id)).endsAt).toBe(pot.endsAt + 86400n);
     const before = await fusdOf(spenderAcct.address);
     await app.release(fakeQorex(funderAcct, seen), meOf(funderAcct), pot);
-    expect((await fusdOf(spenderAcct.address)) - before).toBe(54_500_000n);
+    expect((await fusdOf(spenderAcct.address)) - before).toBe(51_500_000n);
     expect((await app.pot(pot.id)).closed).toBe(true);
   });
 
@@ -268,6 +288,7 @@ describe.skipIf(!ready)("the app against the real contract (local chain)", () =>
       purpose: "Short pot",
       payees: [shopAcct.address],
       names: ["Halden Building Supplies"],
+      limits: [0n],
     });
     const short = await app.pot(BigInt(sent.potId!));
     await mint(short.vault, 5n * FUSD);
@@ -309,6 +330,7 @@ describe.skipIf(!ready)("the app against the real contract (local chain)", () =>
       purpose: "Verified pot",
       payees: [shopAcct.address],
       names: ["Halden Building Supplies"],
+      limits: [0n],
     });
     const ok = await verifyAction(app, created.hash);
     expect(ok).toMatchObject({ fn: "createPot", signed: true, signer: funderAcct.address, valid: true });

@@ -374,3 +374,15 @@ footer.site a:hover { color: var(--ink); }
   .home-hero { padding-top: 36px; }
   .home-hero .row .btn.big { flex: 1 1 auto; }
 }
+
+/* ---------- payees ---------- */
+.payee-row { display: grid; grid-template-columns: 1fr 1.4fr 0.7fr; gap: 12px; }
+@media (max-width: 720px) { .payee-row { grid-template-columns: 1fr; } }
+.payees { list-style: none; margin: 0; padding: 0; }
+.payees li { padding: 14px 0; border-top: 1px solid var(--line); display: grid; gap: 8px; }
+.payees li:first-child { border-top: 0; padding-top: 0; }
+.payee-top, .payee-money { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.request { display: grid; grid-template-columns: 1fr 180px auto; gap: 12px; align-items: end; padding: 12px 0; border-top: 1px solid var(--line); }
+.request:first-of-type { border-top: 0; }
+.request-amount { font-size: 0.82rem; }
+@media (max-width: 720px) { .request { grid-template-columns: 1fr; } }

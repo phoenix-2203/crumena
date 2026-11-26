@@ -5,6 +5,7 @@ import { fundDemoPot } from "../lib/demo";
 import { parseUnits, printable, toEvm, toQor, units } from "../lib/format";
 import { transferToPot } from "../lib/qorex";
 import type { Verification } from "../lib/verify";
+import { codeToHex, potUrl } from "../lib/links";
 import { useApp } from "../state";
 import { ActionButton, Address as Addr, ExplorerLink, Qr, money, potStatus, when } from "../ui";
 
@@ -14,6 +15,21 @@ interface Entry {
   time: number;
   tx: string;
   args: Record<string, string | boolean>;
+}
+
+/** A pot opened by its short link code (#/p/<code>). */
+export function PotByCode({ code }: { code: string }) {
+  const { crumena } = useApp();
+  const [id, setId] = useState<bigint | null>();
+  useEffect(() => {
+    const hex = codeToHex(code);
+    if (!crumena) return;
+    if (!hex) return setId(null);
+    crumena.potByCode(hex).then((x) => setId(x ?? null), () => setId(null));
+  }, [crumena, code]);
+  if (id === null) return <p className="error" style={{ paddingTop: 32 }}>No pot has that link. Check it was copied in full.</p>;
+  if (id === undefined) return <p className="muted" style={{ paddingTop: 32 }}>Finding the pot…</p>;
+  return <PotPage id={id} />;
 }
 
 export function PotPage({ id }: { id: bigint }) {
@@ -121,7 +137,7 @@ export function PotPage({ id }: { id: bigint }) {
       )}
 
       <div className="grid cols-2">
-        <PayeeList pot={pot} payees={payees} />
+        <PayeeList pot={pot} payees={payees} isFunder={isFunder} onDone={after} />
         <PayIn pot={pot} demoFunder={!!demo && isFunder} onDone={after} />
       </div>
       <Activity pot={pot} entries={entries} nameOf={nameOf} />
@@ -220,6 +236,8 @@ function SpenderActions({ pot, payees, onDone }: { pot: Pot; payees: Payee[]; on
   const [memo, setMemo] = useState("");
   const [reqName, setReqName] = useState("");
   const [reqAddr, setReqAddr] = useState("");
+  const [reqAmount, setReqAmount] = useState("");
+  const chosen = payable.find((p) => p.address === to);
   return (
     <div className="grid cols-2">
       <div className="card stack">
@@ -241,6 +259,11 @@ function SpenderActions({ pot, payees, onDone }: { pot: Pot; payees: Payee[]; on
                 ))}
               </select>
             </label>
+            {chosen && chosen.limit > 0n && (
+              <p className="muted small" style={{ margin: 0 }}>
+                {money(chosen.limit > chosen.paid ? chosen.limit - chosen.paid : 0n, pot)} left for {chosen.name}, of {money(chosen.limit, pot)} approved.
+              </p>
+            )}
             <label className="field">
               Amount ({pot.symbol})
               <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={`Up to ${units(pot.balance, pot.decimals)}`} />
@@ -277,12 +300,20 @@ function SpenderActions({ pot, payees, onDone }: { pot: Pot; payees: Payee[]; on
           Address
           <input value={reqAddr} onChange={(e) => setReqAddr(e.target.value)} placeholder="qor1…" spellCheck={false} />
         </label>
+        <label className="field">
+          Amount ({pot.symbol})
+          <span className="hint">What you want to pay them. The funder approves this or an amount of their choice.</span>
+          <input inputMode="decimal" value={reqAmount} onChange={(e) => setReqAmount(e.target.value)} placeholder="0.00" />
+        </label>
         <ActionButton
           run={async () => {
             if (!reqName.trim() || !printable(reqName)) throw new Error("Give a name in plain letters.");
-            const sent = await crumena!.requestPayee(signer!.q, signer!.me, pot, toEvm(reqAddr), reqName.trim());
+            const amount = parseUnits(reqAmount, pot.decimals);
+            if (amount === 0n) throw new Error("Enter the amount you want to pay them.");
+            const sent = await crumena!.requestPayee(signer!.q, signer!.me, pot, toEvm(reqAddr), reqName.trim(), amount);
             setReqName("");
             setReqAddr("");
+            setReqAmount("");
             await onDone("Request sent to the funder.", sent);
           }}
         >
@@ -301,6 +332,7 @@ function FunderActions({ pot, payees, onDone }: { pot: Pot; payees: Payee[]; onD
   const requests = payees.filter((p) => p.requested && !p.approved);
   const [name, setName] = useState("");
   const [addr, setAddr] = useState("");
+  const [upTo, setUpTo] = useState("");
   const [cap, setCap] = useState(pot.maxPerPayment > 0n ? units(pot.maxPerPayment, pot.decimals) : "");
   const [limit, setLimit] = useState(pot.periodLimit > 0n ? units(pot.periodLimit, pot.decimals) : "");
   const [days, setDays] = useState(pot.periodDays || 7);
@@ -311,14 +343,7 @@ function FunderActions({ pot, payees, onDone }: { pot: Pot; payees: Payee[]; onD
         <div className="card stack">
           <h2>Waiting for you</h2>
           {requests.map((r) => (
-            <div className="row between" key={r.address}>
-              <span>
-                The spender asks to pay <strong>{r.name}</strong> <Addr value={r.address} qor />
-              </span>
-              <ActionButton small kind="primary" run={async () => onDone(`${r.name} approved.`, await c.addPayee(q, me, pot, r.address, r.name))}>
-                Approve
-              </ActionButton>
-            </div>
+            <RequestRow key={r.address} pot={pot} r={r} onDone={onDone} />
           ))}
         </div>
       )}
@@ -333,12 +358,19 @@ function FunderActions({ pot, payees, onDone }: { pot: Pot; payees: Payee[]; onD
             Address
             <input value={addr} onChange={(e) => setAddr(e.target.value)} placeholder="qor1…" spellCheck={false} />
           </label>
+          <label className="field">
+            Up to ({pot.symbol}, in total)
+            <span className="hint">The most this pot may ever pay them. Leave empty for no limit beyond the pot's rules.</span>
+            <input inputMode="decimal" value={upTo} onChange={(e) => setUpTo(e.target.value)} placeholder="No limit" />
+          </label>
           <ActionButton
             run={async () => {
               if (!name.trim() || !printable(name)) throw new Error("Give a name in plain letters.");
-              const sent = await c.addPayee(q, me, pot, toEvm(addr), name.trim());
+              const limit = upTo.trim() ? parseUnits(upTo, pot.decimals) : 0n;
+              const sent = await c.addPayee(q, me, pot, toEvm(addr), name.trim(), limit);
               setName("");
               setAddr("");
+              setUpTo("");
               await onDone("Approved.", sent);
             }}
           >
@@ -411,34 +443,108 @@ function FunderActions({ pot, payees, onDone }: { pot: Pot; payees: Payee[]; onD
   );
 }
 
-function PayeeList({ pot, payees }: { pot: Pot; payees: Payee[] }) {
-  const link = `${location.origin}${location.pathname}#/pot/${pot.id}`;
+function RequestRow({ pot, r, onDone }: { pot: Pot; r: Payee; onDone: (m: string, s?: { hash: string }) => Promise<void> }) {
+  const { crumena, signer } = useApp();
+  const [upTo, setUpTo] = useState(r.asked > 0n ? units(r.asked, pot.decimals) : "");
+  return (
+    <div className="request">
+      <div className="ev-body">
+        <div>
+          The spender asks to pay <strong>{r.name}</strong> {r.asked > 0n && <>{money(r.asked, pot)}</>}
+        </div>
+        <div className="ev-meta">
+          <Addr value={r.address} qor />
+        </div>
+      </div>
+      <label className="field request-amount">
+        Approve up to ({pot.symbol})
+        <input inputMode="decimal" value={upTo} onChange={(e) => setUpTo(e.target.value)} placeholder="No limit" />
+      </label>
+      <ActionButton
+        small
+        kind="primary"
+        run={async () => {
+          const limit = upTo.trim() ? parseUnits(upTo, pot.decimals) : 0n;
+          await onDone(`${r.name} approved.`, await crumena!.addPayee(signer!.q, signer!.me, pot, r.address, r.name, limit));
+        }}
+      >
+        Approve
+      </ActionButton>
+    </div>
+  );
+}
+
+function LimitEditor({ pot, p, onDone }: { pot: Pot; p: Payee; onDone: (m: string, s?: { hash: string }) => Promise<void> }) {
+  const { crumena, signer } = useApp();
+  const [open, setOpen] = useState(false);
+  const [upTo, setUpTo] = useState(p.limit > 0n ? units(p.limit, pot.decimals) : "");
+  if (!open)
+    return (
+      <button className="btn ghost small" onClick={() => setOpen(true)}>
+        Change limit
+      </button>
+    );
+  return (
+    <div className="row" style={{ flexWrap: "nowrap" }}>
+      <input inputMode="decimal" value={upTo} onChange={(e) => setUpTo(e.target.value)} placeholder="No limit" aria-label={`Most ${p.name} may receive in total`} style={{ marginTop: 0, maxWidth: 130 }} />
+      <ActionButton
+        small
+        run={async () => {
+          const limit = upTo.trim() ? parseUnits(upTo, pot.decimals) : 0n;
+          await onDone(`${p.name}'s limit changed.`, await crumena!.setPayeeLimit(signer!.q, signer!.me, pot, p.address, limit));
+          setOpen(false);
+        }}
+      >
+        Sign
+      </ActionButton>
+    </div>
+  );
+}
+
+function PayeeList({ pot, payees, isFunder, onDone }: { pot: Pot; payees: Payee[]; isFunder: boolean; onDone: (m: string, s?: { hash: string }) => Promise<void> }) {
+  const { toast } = useApp();
   return (
     <div className="card stack">
-      <div className="row between">
-        <h2 style={{ margin: 0 }}>Payees</h2>
-        <button className="btn small ghost" onClick={() => navigator.clipboard?.writeText(link)} title="Payees open this link to confirm their address">
+      <div className="card-head" style={{ marginBottom: 0 }}>
+        <h2>Payees</h2>
+        <button className="btn small ghost" onClick={() => navigator.clipboard?.writeText(potUrl(pot.vault)).then(() => toast("Link copied."))} title="Payees open this link to confirm their address">
           Copy link for payees
         </button>
       </div>
-      <table className="plain">
-        <tbody>
-          {payees.map((p) => (
-            <tr key={p.address}>
-              <td>
-                <strong>{p.name}</strong>
-                <div>
-                  <Addr value={p.address} qor />
+      <ul className="payees">
+        {payees.map((p) => {
+          const pct = p.limit > 0n ? Math.min(100, Number((p.paid * 100n) / p.limit)) : 0;
+          return (
+            <li key={p.address}>
+              <div className="payee-top">
+                <div className="ev-body">
+                  <strong>{p.name}</strong>
+                  <div className="ev-meta">
+                    <Addr value={p.address} qor />
+                  </div>
                 </div>
-              </td>
-              <td style={{ textAlign: "right" }}>
-                {p.approved ? <span className="pill ok">Approved</span> : p.requested ? <span className="pill warn">Asked for</span> : <span className="pill">Removed</span>}{" "}
-                {p.confirmed && <span className="pill accent">Confirmed by them</span>}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                <div className="row" style={{ justifyContent: "flex-end", gap: 6 }}>
+                  {p.approved ? <span className="pill ok">Approved</span> : p.requested ? <span className="pill warn">Asked for</span> : <span className="pill">Removed</span>}
+                  {p.confirmed && <span className="pill accent">Confirmed by them</span>}
+                </div>
+              </div>
+              <div className="payee-money">
+                <span className="small">
+                  {money(p.paid, pot)} paid
+                  {p.limit > 0n ? <span className="muted"> of {money(p.limit, pot)} approved</span> : p.approved ? <span className="muted"> · no limit</span> : null}
+                  {p.requested && !p.approved && p.asked > 0n && <span className="muted"> · asked for {money(p.asked, pot)}</span>}
+                </span>
+                {isFunder && p.approved && !pot.closed && <LimitEditor pot={pot} p={p} onDone={onDone} />}
+              </div>
+              {p.limit > 0n && (
+                <div className="bar" aria-hidden>
+                  <div style={{ width: `${pct}%` }} />
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
@@ -451,11 +557,13 @@ function describe(e: Entry, pot: Pot, nameOf: (a: string) => string | undefined)
     case "PotCreated":
       return "Pot created by the funder";
     case "PayeeApproved":
-      return `Funder approved ${a.name}`;
+      return `Funder approved ${a.name}${a.limit !== undefined && BigInt(a.limit as string) > 0n ? `, up to ${money(BigInt(a.limit as string), pot)}` : ""}`;
+    case "PayeeLimitChanged":
+      return `Funder set ${nameOf(a.payee as string) ?? "a payee"}'s limit to ${BigInt(a.limit as string) > 0n ? money(BigInt(a.limit as string), pot) : "no limit"}`;
     case "PayeeRemoved":
       return `Funder stopped payments to ${nameOf(a.payee as string) ?? "a payee"}`;
     case "PayeeRequested":
-      return `Spender asked to pay ${a.name}`;
+      return `Spender asked to pay ${a.name}${a.amount !== undefined ? ` ${money(BigInt(a.amount as string), pot)}` : ""}`;
     case "PayeeConfirmed":
       return `${nameOf(a.payee as string) ?? "A payee"} confirmed their address`;
     case "Paid":
@@ -481,7 +589,7 @@ function describe(e: Entry, pot: Pot, nameOf: (a: string) => string | undefined)
   }
 }
 
-const SIGNED = new Set(["PotCreated", "PayeeApproved", "PayeeRemoved", "PayeeRequested", "PayeeConfirmed", "Paid", "EndChanged", "RulesChanged", "FrozenChanged", "Released"]);
+const SIGNED = new Set(["PotCreated", "PayeeApproved", "PayeeLimitChanged", "PayeeRemoved", "PayeeRequested", "PayeeConfirmed", "Paid", "EndChanged", "RulesChanged", "FrozenChanged", "Released"]);
 
 function Activity({ pot, entries, nameOf }: { pot: Pot; entries?: Entry[]; nameOf: (a: string) => string | undefined }) {
   function csv() {
@@ -521,6 +629,7 @@ function Activity({ pot, entries, nameOf }: { pot: Pot; entries?: Entry[]; nameO
 const ICON: Record<string, string> = {
   PotCreated: "✦",
   PayeeApproved: "+",
+  PayeeLimitChanged: "≤",
   PayeeRemoved: "−",
   PayeeRequested: "?",
   PayeeConfirmed: "✓",

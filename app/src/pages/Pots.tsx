@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { explain, type Pot } from "../lib/crumena";
 import { units } from "../lib/format";
+import { potHref } from "../lib/links";
 import { useApp } from "../state";
 import { NeedsSigner, money, potStatus, when } from "../ui";
 
@@ -67,7 +68,7 @@ function PotList() {
           const total = p.balance + p.paidOut;
           const pct = total > 0n ? Number((p.paidOut * 100n) / total) : 0;
           return (
-            <a key={p.id.toString()} href={`#/pot/${p.id}`} className="card pot-card">
+            <a key={p.id.toString()} href={potHref(p.vault)} className="card pot-card">
               <div className="card-head" style={{ marginBottom: 0 }}>
                 <span className="label">Pot #{p.id.toString()}</span>
                 <span className={`pill ${s.tone}`}>{s.label}</span>

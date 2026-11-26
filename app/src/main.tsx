@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { Demo } from "./pages/Demo";
 import { Home } from "./pages/Home";
 import { NewPot } from "./pages/NewPot";
-import { PotPage } from "./pages/PotPage";
+import { PotByCode, PotPage } from "./pages/PotPage";
 import { Pots } from "./pages/Pots";
 import { AppProvider, useApp, useRoute } from "./state";
 import "./fonts";
@@ -25,6 +25,8 @@ function Routes() {
       return <NewPot />;
     case "pot":
       return arg && /^\d+$/.test(arg) ? <PotPage key={arg} id={BigInt(arg)} /> : <p>That isn't a pot number.</p>;
+    case "p":
+      return arg ? <PotByCode key={arg} code={arg} /> : <p>That link is missing its code.</p>;
     default:
       return (
         <p>

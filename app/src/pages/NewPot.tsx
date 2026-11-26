@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Address } from "viem";
 import { explain, NO_RULES, type Rules } from "../lib/crumena";
 import { parseUnits, printable, toEvm } from "../lib/format";
+import { potPath } from "../lib/links";
 import { go, useApp } from "../state";
 import { NeedsSigner } from "../ui";
 
@@ -32,8 +33,8 @@ function Form() {
   const shopDemo = demo?.find((p) => p.role === "shop");
   const [purpose, setPurpose] = useState(demo ? "Monthly budget" : "");
   const [spender, setSpender] = useState(spenderDemo?.qor ?? "");
-  const [payees, setPayees] = useState<{ name: string; address: string }[]>(
-    shopDemo ? [{ name: "Approved vendor", address: shopDemo.qor }] : [{ name: "", address: "" }],
+  const [payees, setPayees] = useState<{ name: string; address: string; upTo: string }[]>(
+    shopDemo ? [{ name: "Approved vendor", address: shopDemo.qor, upTo: "30" }] : [{ name: "", address: "", upTo: "" }],
   );
   const [days, setDays] = useState(30);
   const [cap, setCap] = useState(demo ? "20" : "");
@@ -43,7 +44,7 @@ function Form() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
 
-  function check(): { recipient: Address; payeeAddrs: Address[]; rules: Rules } | undefined {
+  function check(): { recipient: Address; payeeAddrs: Address[]; limits: bigint[]; rules: Rules } | undefined {
     const e: Record<string, string> = {};
     let recipient: Address | undefined;
     if (!purpose.trim()) e.purpose = "Say what the money is for.";
@@ -55,7 +56,13 @@ function Form() {
       e.spender = (x as Error).message;
     }
     const payeeAddrs: Address[] = [];
+    const limits: bigint[] = [];
     payees.forEach((p, i) => {
+      try {
+        limits.push(p.upTo.trim() ? parseUnits(p.upTo, 6) : 0n);
+      } catch (x) {
+        e[`upTo${i}`] = (x as Error).message;
+      }
       if (!p.name.trim() || !printable(p.name) || p.name.length > 48) e[`name${i}`] = "A name, up to 48 plain characters.";
       try {
         const a = toEvm(p.address);
@@ -81,7 +88,7 @@ function Form() {
       e.limit = (x as Error).message;
     }
     setErrors(e);
-    return Object.keys(e).length || !recipient ? undefined : { recipient, payeeAddrs, rules };
+    return Object.keys(e).length || !recipient ? undefined : { recipient, payeeAddrs, limits, rules };
   }
 
   async function submit() {
@@ -99,9 +106,11 @@ function Form() {
         purpose: purpose.trim(),
         payees: ok.payeeAddrs,
         names: payees.map((p) => p.name.trim()),
+        limits: ok.limits,
       });
       toast(`Pot #${sent.potId} created.`);
-      go(`/pot/${sent.potId}`);
+      const created = await crumena.pot(BigInt(sent.potId!));
+      go(potPath(created.vault));
     } catch (e) {
       toast(explain(e));
     } finally {
@@ -151,11 +160,11 @@ function Form() {
       <section className="form-section">
         <header>
           <h2>Who can be paid</h2>
-          <p>Only these addresses can receive money from the pot. You can approve more later.</p>
+          <p>Only these addresses can receive money from the pot, each up to the amount you set in total. You can approve more later.</p>
         </header>
         <div className="card stack">
         {payees.map((p, i) => (
-          <div className="grid cols-2" key={i}>
+          <div className="payee-row" key={i}>
             <label className="field">
               Name
               <input value={p.name} maxLength={48} onChange={(e) => setPayees(payees.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} placeholder="Vendor name" />
@@ -166,11 +175,16 @@ function Form() {
               <input value={p.address} onChange={(e) => setPayees(payees.map((x, j) => (j === i ? { ...x, address: e.target.value } : x)))} placeholder="qor1…" spellCheck={false} />
               {errors[`addr${i}`] && <div className="error">{errors[`addr${i}`]}</div>}
             </label>
+            <label className="field">
+              Up to (fUSD)
+              <input inputMode="decimal" value={p.upTo} onChange={(e) => setPayees(payees.map((x, j) => (j === i ? { ...x, upTo: e.target.value } : x)))} placeholder="No limit" />
+              {errors[`upTo${i}`] && <div className="error">{errors[`upTo${i}`]}</div>}
+            </label>
           </div>
         ))}
         <div className="row">
           {payees.length < 10 && (
-            <button className="btn small" onClick={() => setPayees([...payees, { name: "", address: "" }])}>
+            <button className="btn small" onClick={() => setPayees([...payees, { name: "", address: "", upTo: "" }])}>
               Add another payee
             </button>
           )}

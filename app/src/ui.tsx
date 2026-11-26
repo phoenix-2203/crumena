@@ -33,11 +33,62 @@ const SECTIONS = [
   ["Proof", "proof"],
 ] as const;
 
+type Theme = "light" | "dark";
+const THEME_KEY = "crumena:theme";
+
+/** The theme follows the device until the person picks one; the pick is remembered in this browser. */
+function ThemeToggle() {
+  const system = (): Theme => (window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  const [theme, setTheme] = useState<Theme>(() => (document.documentElement.dataset.theme as Theme | undefined) ?? system());
+  useEffect(() => {
+    const mq = window.matchMedia?.("(prefers-color-scheme: dark)");
+    const on = () => !document.documentElement.dataset.theme && setTheme(system());
+    mq?.addEventListener("change", on);
+    return () => mq?.removeEventListener("change", on);
+  }, []);
+  const next: Theme = theme === "dark" ? "light" : "dark";
+  return (
+    <button
+      className="theme-toggle"
+      aria-label={`Switch to ${next} mode`}
+      title={`Switch to ${next} mode`}
+      onClick={() => {
+        document.documentElement.dataset.theme = next;
+        try {
+          localStorage.setItem(THEME_KEY, next);
+        } catch {
+          /* private mode: the choice lasts for this page only */
+        }
+        setTheme(next);
+      }}
+    >
+      {theme === "dark" ? (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
+          <circle cx="12" cy="12" r="4.2" />
+          <path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" strokeLinecap="round" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
+          <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" strokeLinejoin="round" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
 export function Layout({ children }: { children: ReactNode }) {
   const { signer, demo, actAs, setDemo, connectQorex, signOut, toast } = useApp();
   const [page] = useRoute();
   return (
     <>
+      <svg className="svg-defs" aria-hidden focusable="false">
+        <defs>
+          <linearGradient id="crumena-grad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" style={{ stopColor: "var(--g1)" }} />
+            <stop offset="1" style={{ stopColor: "var(--g2)" }} />
+          </linearGradient>
+        </defs>
+      </svg>
       {demo && (
         <div className="demo-bar" role="region" aria-label="Demo">
           <div className="wrap">
@@ -71,6 +122,7 @@ export function Layout({ children }: { children: ReactNode }) {
             </a>
           </nav>
           <nav className="nav" aria-label="Account">
+            <ThemeToggle />
             {signer && (
               <a className="btn ghost small" href="#/pots" aria-current={page === "pots" ? "page" : undefined}>
                 My pots

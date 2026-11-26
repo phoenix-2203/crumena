@@ -82,6 +82,10 @@ await page.getByText(/Valid ML-DSA-87 signature|doesn't check out/).waitFor({ ti
 console.log("receipt:", (await page.locator(".receipt-check .pill").textContent())?.trim(), page.url().replace(base, ""));
 await shot("09-receipt");
 await page.goBack();
+await page.locator(".demo-guide summary").click();
+console.log("guide:", (await page.locator(".demo-guide summary").textContent())?.trim());
+await page.screenshot({ path: `${out}/10-guide.png` });
+await page.locator(".demo-guide summary").click();
 
 await page.setViewportSize({ width: 390, height: 844 });
 await shot("07-mobile");

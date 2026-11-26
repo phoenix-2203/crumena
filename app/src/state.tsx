@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { resetSteps } from "./lib/progress";
 import { createCrumena, loadConfig, type Config, type Crumena } from "./lib/crumena";
 import { demoSigner, loadDemo, meOfPersona, saveDemo, type Persona, type Role } from "./lib/demo";
 import { connect, findQorex, type Me, type Qorex } from "./lib/qorex";
@@ -79,6 +80,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   const setDemo = useCallback((p: Persona[] | undefined) => {
+    if (p) resetSteps();
     saveDemo(p);
     setDemoState(p);
     const funder = p?.find((x) => x.role === "funder");

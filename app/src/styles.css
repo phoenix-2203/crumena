@@ -605,3 +605,17 @@ footer.site a:hover { color: var(--ink); }
 .live-tag::before { content: ""; width: 6px; height: 6px; border-radius: 6px; background: currentColor; animation: pulse 1.8s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: 0.3; } }
 .live-line + .trust { margin-top: 14px; }
+
+/* ---------- demo guide ---------- */
+.demo-guide { position: relative; }
+.demo-guide summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; border: 1px solid rgba(255, 255, 255, 0.22); border-radius: 999px; padding: 4px 13px; }
+.demo-guide summary::-webkit-details-marker { display: none; }
+.demo-guide-bar { width: 54px; height: 4px; border-radius: 4px; background: rgba(255, 255, 255, 0.15); overflow: hidden; }
+.demo-guide-bar i { display: block; height: 100%; background: linear-gradient(90deg, #c06a30, #f3bd8e); transition: width 0.5s ease; }
+.demo-guide-panel { position: absolute; top: 40px; right: 0; width: 300px; z-index: 45; padding: 14px; background: #161514; border: 1px solid #2c2a27; border-radius: 14px; box-shadow: 0 20px 40px -20px rgba(0, 0, 0, 0.6); }
+.demo-guide ol { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 8px; }
+.demo-guide li { display: flex; align-items: center; gap: 10px; color: #cfcbc2; }
+.demo-guide li > span:first-child { width: 22px; height: 22px; border-radius: 22px; display: grid; place-items: center; border: 1px solid #3a3733; font-size: 0.75rem; font-family: var(--mono); }
+.demo-guide li.done { color: #ecebe6; }
+.demo-guide li.done > span:first-child { background: #6fcf97; border-color: #6fcf97; color: #0d0c0b; }
+.demo-guide p { margin: 0; color: #a8a59d; font-size: 0.82rem; }

@@ -59,6 +59,8 @@ activity.start(1500);
 const demoFunders = new Set<string>();
 
 const app = new Hono();
+// The public challenge needs real ML-DSA-87 checks (pqcVerify), which this local chain stands in for, so it stays off here.
+app.get("/api/challenge", (c) => c.json({ ready: false }));
 app.get("/api/config", (c) => c.json({ chainId: "qorechain-diana", evmChainId: 9800, crumena: CRUMENA, fusd: FUSD, relayer: toQor(relayer.address), fromBlock: Number(dep.blockNumber) }));
 app.post("/api/relay", async (c) => {
   const { data } = (await c.req.json()) as { data: Hex };

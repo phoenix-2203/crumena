@@ -6,6 +6,7 @@ import { parseUnits, printable, toEvm, toQor, units } from "../lib/format";
 import { transferToPot } from "../lib/qorex";
 import type { Verification } from "../lib/verify";
 import { codeToHex, potCode, potUrl } from "../lib/links";
+import { markStep } from "../lib/progress";
 import { useApp } from "../state";
 import { ActionButton, Address as Addr, ExplorerLink, Qr, money, potStatus, when } from "../ui";
 
@@ -284,6 +285,7 @@ function SpenderActions({ pot, payees, onDone }: { pot: Pot; payees: Payee[]; on
                 const sent = await crumena!.pay(signer!.q, signer!.me, pot, to as Address, parseUnits(amount, pot.decimals), memo.trim());
                 setAmount("");
                 setMemo("");
+                markStep("pay");
                 await onDone("Paid.", sent, true);
               }}
             >

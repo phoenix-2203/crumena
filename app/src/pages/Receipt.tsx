@@ -3,6 +3,7 @@ import type { Hex } from "viem";
 import { explain, type Payee, type Pot } from "../lib/crumena";
 import { toQor, units } from "../lib/format";
 import { codeToHex, potHref, potUrl } from "../lib/links";
+import { markStep } from "../lib/progress";
 import type { Verification } from "../lib/verify";
 import { useApp } from "../state";
 import { ExplorerLink, Mark, when } from "../ui";
@@ -39,6 +40,7 @@ export function Receipt({ code, tx }: { code: string; tx: string }) {
       setPot(p);
       const e = activity.entries.find((x) => x.kind === "Paid" && x.tx.toLowerCase() === tx.toLowerCase()) ?? null;
       setEntry(e);
+      if (e) markStep("receipt");
       if (e) setPayee(list.find((x) => x.address.toLowerCase() === String(e.args.payee).toLowerCase()));
       if (e) {
         const { verifyAction } = await import("../lib/verify"); // ML-DSA-87 code loads only here

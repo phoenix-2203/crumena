@@ -3,6 +3,7 @@ import type { Address } from "viem";
 import { explain, NO_RULES, type Rules } from "../lib/crumena";
 import { parseUnits, printable, toEvm } from "../lib/format";
 import { potPath } from "../lib/links";
+import { markStep } from "../lib/progress";
 import { go, useApp } from "../state";
 import { NeedsSigner } from "../ui";
 
@@ -109,6 +110,7 @@ function Form() {
         limits: ok.limits,
       });
       toast(`Pot #${sent.potId} created.`);
+      markStep("create");
       const created = await crumena.pot(BigInt(sent.potId!));
       go(potPath(created.vault));
     } catch (e) {

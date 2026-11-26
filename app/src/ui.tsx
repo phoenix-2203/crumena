@@ -3,6 +3,7 @@ import { renderSVG } from "uqr";
 import { explain, type Pot } from "./lib/crumena";
 import { short, toQor, units } from "./lib/format";
 import { QOREX_INSTALL_URL } from "./lib/qorex";
+import { DEMO_STEPS, markStep, useSteps } from "./lib/progress";
 import { go, useApp, useRoute } from "./state";
 
 export const EXPLORER = "https://explore.qore.network";
@@ -78,6 +79,37 @@ function ThemeToggle() {
   );
 }
 
+function DemoGuide() {
+  const done = useSteps();
+  const n = DEMO_STEPS.filter(([k]) => done.includes(k)).length;
+  return (
+    <details className="demo-guide">
+      <summary>
+        Start here · {n} of {DEMO_STEPS.length}
+        <span className="demo-guide-bar" aria-hidden>
+          <i style={{ width: `${(n / DEMO_STEPS.length) * 100}%` }} />
+        </span>
+      </summary>
+      <div className="demo-guide-panel">
+      <ol>
+        {DEMO_STEPS.map(([k, label], i) => (
+          <li key={k} className={done.includes(k) ? "done" : ""}>
+            <span aria-hidden>{done.includes(k) ? "✓" : i + 1}</span>
+            {label}
+            <span className="sr-only">{done.includes(k) ? " (done)" : ""}</span>
+          </li>
+        ))}
+      </ol>
+      <p>
+        {n === DEMO_STEPS.length
+          ? "All done. Every step above is on QoreChain testnet."
+          : "As the funder, create a pot and add test fUSD. As the spender, pay the payee, then try paying more than the limit. Open a receipt from the pot's history."}
+      </p>
+      </div>
+    </details>
+  );
+}
+
 export function Layout({ children }: { children: ReactNode }) {
   const { signer, demo, actAs, setDemo, connectQorex, signOut, toast } = useApp();
   const [page] = useRoute();
@@ -103,6 +135,7 @@ export function Layout({ children }: { children: ReactNode }) {
               </button>
             ))}
             <span style={{ flex: 1 }} />
+            <DemoGuide />
             <button onClick={() => (setDemo(undefined), go("/"))}>End demo</button>
           </div>
         </div>
@@ -257,6 +290,9 @@ export function ActionButton(props: { children: ReactNode; run: () => Promise<un
           await props.run();
         } catch (e) {
           toast(explain(e));
+          // The demo guide's "try to overspend" step: the contract refused a payment over a limit.
+          const reason = (e as { reason?: string }).reason;
+          if (reason && /^Over(Payment|Period|Payee)Limit$|^NotApproved$/.test(reason)) markStep("refused");
         } finally {
           setBusy(false);
         }

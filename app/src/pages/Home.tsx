@@ -44,7 +44,10 @@ export function Home() {
         <div className="hero-copy reveal">
           <span className="eyebrow">
             <i aria-hidden />
-            Live on QoreChain testnet <b aria-hidden>·</b> post-quantum signed
+            Live on QoreChain testnet
+            <span className="eb2">
+              <b aria-hidden>·</b> post-quantum signed
+            </span>
           </span>
           <h1>
             Money for <span className="line">one purpose.</span>

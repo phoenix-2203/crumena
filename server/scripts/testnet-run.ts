@@ -11,7 +11,8 @@
  */
 import { EthNativeSigner, deriveUnifiedAccount, generateMnemonic, openEvmWindowMsg } from "@qorechain/sdk";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { encodeFunctionData, getAddress, type Hex } from "viem";
+import { messagePqSignBytes, pqVerify } from "@qorechain/qoresign";
+import { decodeAbiParameters, encodeFunctionData, getAddress, hexToBytes, parseAbi, type Hex } from "viem";
 import { CRUMENA_ABI } from "../../shared/crumena-abi";
 import {
   CHAIN_ID,
@@ -132,6 +133,33 @@ const paySig = spender.signText(payText);
 const payUntil = v;
 const paid = await relay("pay", [potId, shopA.evm, 25n * FUSD_UNIT, "PO-1042 materials", spender.evm, { nonce: n, validUntil: v, signature: paySig }]);
 record("The person spending the pot pays the approved shop 25 fUSD, post-quantum signed", (await fusdOf(shopA.evm)) === 25n * FUSD_UNIT, `shop received 25 fUSD; the spender sent no transaction and paid no gas`, paid.hash);
+
+// The same check, done independently of the contract (what the app's "Verify" does in the browser): the statement
+// as of the block before, the signer's key from pqcKeyStatus at that block, and ML-DSA-87 verification here.
+{
+  const rcpt = await publicClient.getTransactionReceipt({ hash: paid.hash });
+  const before = rcpt.blockNumber - 1n;
+  const text = (await publicClient.readContract({
+    address: CRUMENA,
+    abi: CRUMENA_ABI,
+    functionName: "payStatement",
+    args: [potId, shopA.evm, 25n * FUSD_UNIT, "PO-1042 materials", spender.evm, firstPayNonce, payUntil],
+    blockNumber: before,
+  })) as string;
+  const status = await publicClient.call({
+    to: "0x0000000000000000000000000000000000000a02",
+    data: encodeFunctionData({ abi: parseAbi(["function pqcKeyStatus(address)"]), functionName: "pqcKeyStatus", args: [spender.evm] }),
+    blockNumber: before,
+  });
+  const [, , key] = decodeAbiParameters([{ type: "bool" }, { type: "uint8" }, { type: "bytes" }, { type: "bool" }], status.data!);
+  const valid = pqVerify(hexToBytes(key), messagePqSignBytes(CHAIN_ID, text), hexToBytes(paySig));
+  const changed = pqVerify(hexToBytes(key), messagePqSignBytes(CHAIN_ID, text.replace("Amount: 25 ", "Amount: 26 ")), hexToBytes(paySig));
+  record(
+    "Independent check of that payment: statement and key read from the chain at the block before, ML-DSA-87 verified off chain",
+    valid && !changed,
+    `signature valid: ${valid}; the same signature over "Amount: 26": ${changed}`,
+  );
+}
 
 // --------------------------------------------------------- 4. payee confirms
 

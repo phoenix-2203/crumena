@@ -152,6 +152,7 @@ function StatementModal() {
   return (
     <div className="modal-back" role="dialog" aria-modal="true" aria-labelledby="sign-title">
       <div className="modal stack">
+        <span className="label">Review before signing</span>
         <h2 id="sign-title">{FN_TITLE[pending.fn] ?? "Sign"}</h2>
         <p className="muted small">
           This is the exact text {signer?.demo ? "the demo signer" : "QoreX"} will sign with your post-quantum key (ML-DSA-87). The contract rebuilds it from
@@ -159,6 +160,10 @@ function StatementModal() {
         </p>
         <div className="statement" tabIndex={0}>
           {pending.statement}
+        </div>
+        <div className="receipt-foot">
+          <span>ML-DSA-87 · checked by pqcVerify</span>
+          <span>No gas: the relayer pays it</span>
         </div>
         <div className="row">
           <button className="btn primary" autoFocus onClick={() => pending.resolve(true)}>

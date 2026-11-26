@@ -24,6 +24,7 @@
     "@types/react": "^19.3.3",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.3.0",
+    "axe-core": "^4.14.1",
     "hono": "^4.13.22",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",

@@ -24,6 +24,7 @@ const deployment = (() => {
   return existsSync(file) ? (JSON.parse(readFileSync(file, "utf8")) as { Crumena: string; block?: number }) : undefined;
 })();
 const CRUMENA = getAddress(process.env.CRUMENA_ADDRESS ?? deployment?.Crumena ?? "0x0000000000000000000000000000000000000000");
+if (/^0x0{40}$/.test(CRUMENA)) throw new Error("No Crumena address: deployments/testnet.json is missing (update the code) or set CRUMENA_ADDRESS.");
 const mnemonic = process.env.RELAYER_MNEMONIC?.trim();
 if (!mnemonic) throw new Error("Set RELAYER_MNEMONIC to a throwaway testnet phrase (in server/.env).");
 

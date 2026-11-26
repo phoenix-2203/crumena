@@ -107,6 +107,7 @@ const newPot = {
   purpose: "Office fit-out, phase 1",
   payees: [shopA.evm],
   names: ["Halden Building Supplies"],
+  limits: [60n * FUSD_UNIT], // the most Halden may receive from this pot, in total
 };
 let n = await nonce(funder);
 let v = until();
@@ -114,7 +115,10 @@ const createText = await read<string>("createStatement", [newPot, n, v]);
 const created = await relay("createPot", [newPot, { nonce: n, validUntil: v, signature: funder.signText(createText) }]);
 const potId = BigInt(created.potId!);
 const pot = await read<{ vault: Hex; funder: Hex }>("potInfo", [potId]);
-record("Funder creates a pot, signed with ML-DSA-87 and checked by pqcVerify", true, `pot #${potId}, vault ${pot.vault}, one approved payee`, created.hash);
+record("Funder creates a pot, signed with ML-DSA-87 and checked by pqcVerify", true, `pot #${potId}, vault ${pot.vault}, one approved payee (up to 60 fUSD)`, created.hash);
+const code = pot.vault.slice(0, 18) as Hex;
+const byCode = await read<bigint>("potOfCode", [code]);
+record("The pot's short link code (the first 8 bytes of its vault) finds it", byCode === potId, `potOfCode(${code}) = ${byCode}`);
 
 // ------------------------------------------------------------------- 2. fund
 
@@ -173,21 +177,29 @@ record("The shop confirms the address is its own, with its own ML-DSA-87 key", t
 
 n = await nonce(spender);
 v = until();
-const reqText = await read<string>("requestPayeeStatement", [potId, shopB.evm, "Brightline Electrical", n, v]);
-const requested = await relay("requestPayee", [potId, shopB.evm, "Brightline Electrical", { nonce: n, validUntil: v, signature: spender.signText(reqText) }]);
-record("The spender asks the funder to approve a new shop", true, "request recorded; the pot still can't pay it", requested.hash);
+const reqText = await read<string>("requestPayeeStatement", [potId, shopB.evm, "Brightline Electrical", 15n * FUSD_UNIT, n, v]);
+const requested = await relay("requestPayee", [potId, shopB.evm, "Brightline Electrical", 15n * FUSD_UNIT, { nonce: n, validUntil: v, signature: spender.signText(reqText) }]);
+const asked = (await read<{ asked: bigint }>("payeeInfo", [potId, shopB.evm])).asked;
+record("The spender asks the funder to approve a new shop, for 15 fUSD", asked === 15n * FUSD_UNIT, "request recorded with its amount; the pot still can't pay it", requested.hash);
 
 n = await nonce(funder);
 v = until();
-const addText = await read<string>("addPayeeStatement", [potId, shopB.evm, "Brightline Electrical", n, v]);
-const added = await relay("addPayee", [potId, shopB.evm, "Brightline Electrical", { nonce: n, validUntil: v, signature: funder.signText(addText) }]);
-record("The funder approves it, post-quantum signed", true, "Brightline Electrical approved", added.hash);
+const addText = await read<string>("addPayeeStatement", [potId, shopB.evm, "Brightline Electrical", 12n * FUSD_UNIT, n, v]);
+const added = await relay("addPayee", [potId, shopB.evm, "Brightline Electrical", 12n * FUSD_UNIT, { nonce: n, validUntil: v, signature: funder.signText(addText) }]);
+const limitB = (await read<{ limit: bigint }>("payeeInfo", [potId, shopB.evm])).limit;
+record("The funder approves it up to 12 fUSD, an amount of its own choice, post-quantum signed", limitB === 12n * FUSD_UNIT, "Brightline Electrical approved, up to 12 fUSD in total", added.hash);
 
 n = await nonce(spender);
 v = until();
 const pay2Text = await read<string>("payStatement", [potId, shopB.evm, 10n * FUSD_UNIT, "", spender.evm, n, v]);
 const paid2 = await relay("pay", [potId, shopB.evm, 10n * FUSD_UNIT, "", spender.evm, { nonce: n, validUntil: v, signature: spender.signText(pay2Text) }]);
 record("The spender pays the new shop 10 fUSD", (await fusdOf(shopB.evm)) === 10n * FUSD_UNIT, "a shop with no post-quantum key of its own can still be paid", paid2.hash);
+
+n = await nonce(spender);
+v = until();
+const overShopText = await read<string>("payStatement", [potId, shopB.evm, 5n * FUSD_UNIT, "", spender.evm, n, v]);
+const overShop = await refused("pay", [potId, shopB.evm, 5n * FUSD_UNIT, "", spender.evm, { nonce: n, validUntil: v, signature: spender.signText(overShopText) }]);
+record("Rule: a payment past what the funder approved for that shop is refused, even properly signed", overShop === "OverPayeeLimit", `refused: ${overShop} (2 fUSD left for this shop)`);
 
 // ------------------------------------------------------------------ 6. attacks
 
@@ -225,7 +237,7 @@ const evmTry = await funder.wallet.sendTransaction({
   account: funder.wallet.account!,
   chain: funder.wallet.chain,
   to: CRUMENA,
-  data: encodeFunctionData({ abi: CRUMENA_ABI, functionName: "addPayee", args: [potId, attacker.evm, "Totally legit", { nonce: n, validUntil: until(), signature: garbage }] }),
+  data: encodeFunctionData({ abi: CRUMENA_ABI, functionName: "addPayee", args: [potId, attacker.evm, "Totally legit", 0n, { nonce: n, validUntil: until(), signature: garbage }] }),
   gas: 1_500_000n,
   maxFeePerGas: MAX_FEE_PER_GAS,
   maxPriorityFeePerGas: PRIORITY_FEE,
@@ -237,8 +249,8 @@ record("Attack: inside an open window, send addPayee from the funder's own addre
 // c. A real ML-DSA-87 signature, but by the attacker's own registered key.
 n = await nonce(funder);
 v = until();
-const forgeText = await read<string>("addPayeeStatement", [potId, attacker.evm, "Totally legit", n, v]);
-const c = await refused("addPayee", [potId, attacker.evm, "Totally legit", { nonce: n, validUntil: v, signature: attacker.signText(forgeText) }]);
+const forgeText = await read<string>("addPayeeStatement", [potId, attacker.evm, "Totally legit", 0n, n, v]);
+const c = await refused("addPayee", [potId, attacker.evm, "Totally legit", 0n, { nonce: n, validUntil: v, signature: attacker.signText(forgeText) }]);
 record("Attack: the funder's statement signed with the attacker's own registered ML-DSA-87 key", c === "BadPqcSignature", `refused: ${c}`);
 
 // d. Replay the spender's first payment. The relayer answers a repeat of the same call with the first result and

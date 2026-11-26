@@ -87,7 +87,8 @@ it.skipIf(!ready)("lists a pot's history once each, newest first: created, appro
     rules: { maxPerPayment: 0n, periodLimit: 0n, periodDays: 0 },
     purpose: "School fees",
     payees: [shop!.address],
-    names: ["Greenfield School"],
+    names: ["Approved vendor"],
+    limits: [0n],
   };
   const until = BigInt(Math.floor(Date.now() / 1000) + 3600);
   const st = await read<string>("createStatement", [p, 0n, until]);

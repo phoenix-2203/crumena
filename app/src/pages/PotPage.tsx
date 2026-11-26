@@ -5,7 +5,7 @@ import { fundDemoPot } from "../lib/demo";
 import { parseUnits, printable, toEvm, toQor, units } from "../lib/format";
 import { transferToPot } from "../lib/qorex";
 import type { Verification } from "../lib/verify";
-import { codeToHex, potUrl } from "../lib/links";
+import { codeToHex, potCode, potUrl } from "../lib/links";
 import { useApp } from "../state";
 import { ActionButton, Address as Addr, ExplorerLink, Qr, money, potStatus, when } from "../ui";
 
@@ -70,10 +70,15 @@ export function PotPage({ id }: { id: bigint }) {
   const s = potStatus(pot);
   const open = !pot.closed && BigInt(Math.floor(Date.now() / 1000)) <= pot.endsAt;
   const nameOf = (a: string) => payees.find((p) => p.address.toLowerCase() === a.toLowerCase())?.name;
-  const after = async (msg: string, sent?: { hash: string }) => {
+  const after = async (msg: string, sent?: { hash: string }, receipt?: boolean) => {
     toast(
       <span>
-        {msg} {sent && <ExplorerLink tx={sent.hash}>View it on the explorer.</ExplorerLink>}
+        {msg}{" "}
+        {sent && receipt ? (
+          <a href={`#/r/${potCode(pot.vault)}/${sent.hash}`}>See the receipt.</a>
+        ) : (
+          sent && <ExplorerLink tx={sent.hash}>View it on the explorer.</ExplorerLink>
+        )}
       </span>,
     );
     await load();
@@ -181,7 +186,7 @@ function Limits({ pot, period }: { pot: Pot; period?: { spent: bigint; limit: bi
   );
 }
 
-function PayIn({ pot, demoFunder, onDone }: { pot: Pot; demoFunder: boolean; onDone: (m: string, s?: { hash: string }) => Promise<void> }) {
+function PayIn({ pot, demoFunder, onDone }: { pot: Pot; demoFunder: boolean; onDone: (m: string, s?: { hash: string }, receipt?: boolean) => Promise<void> }) {
   const { signer } = useApp();
   const [amount, setAmount] = useState("");
   return (
@@ -228,7 +233,7 @@ function PayIn({ pot, demoFunder, onDone }: { pot: Pot; demoFunder: boolean; onD
   );
 }
 
-function SpenderActions({ pot, payees, onDone }: { pot: Pot; payees: Payee[]; onDone: (m: string, s?: { hash: string }) => Promise<void> }) {
+function SpenderActions({ pot, payees, onDone }: { pot: Pot; payees: Payee[]; onDone: (m: string, s?: { hash: string }, receipt?: boolean) => Promise<void> }) {
   const { crumena, signer } = useApp();
   const payable = payees.filter((p) => p.approved && (!pot.confirmedOnly || p.confirmed));
   const [to, setTo] = useState(payable[0]?.address ?? "");
@@ -279,7 +284,7 @@ function SpenderActions({ pot, payees, onDone }: { pot: Pot; payees: Payee[]; on
                 const sent = await crumena!.pay(signer!.q, signer!.me, pot, to as Address, parseUnits(amount, pot.decimals), memo.trim());
                 setAmount("");
                 setMemo("");
-                await onDone("Paid.", sent);
+                await onDone("Paid.", sent, true);
               }}
             >
               Review and sign
@@ -324,7 +329,7 @@ function SpenderActions({ pot, payees, onDone }: { pot: Pot; payees: Payee[]; on
   );
 }
 
-function FunderActions({ pot, payees, onDone }: { pot: Pot; payees: Payee[]; onDone: (m: string, s?: { hash: string }) => Promise<void> }) {
+function FunderActions({ pot, payees, onDone }: { pot: Pot; payees: Payee[]; onDone: (m: string, s?: { hash: string }, receipt?: boolean) => Promise<void> }) {
   const { crumena, signer } = useApp();
   const c = crumena!;
   const q = signer!.q;
@@ -443,7 +448,7 @@ function FunderActions({ pot, payees, onDone }: { pot: Pot; payees: Payee[]; onD
   );
 }
 
-function RequestRow({ pot, r, onDone }: { pot: Pot; r: Payee; onDone: (m: string, s?: { hash: string }) => Promise<void> }) {
+function RequestRow({ pot, r, onDone }: { pot: Pot; r: Payee; onDone: (m: string, s?: { hash: string }, receipt?: boolean) => Promise<void> }) {
   const { crumena, signer } = useApp();
   const [upTo, setUpTo] = useState(r.asked > 0n ? units(r.asked, pot.decimals) : "");
   return (
@@ -474,7 +479,7 @@ function RequestRow({ pot, r, onDone }: { pot: Pot; r: Payee; onDone: (m: string
   );
 }
 
-function LimitEditor({ pot, p, onDone }: { pot: Pot; p: Payee; onDone: (m: string, s?: { hash: string }) => Promise<void> }) {
+function LimitEditor({ pot, p, onDone }: { pot: Pot; p: Payee; onDone: (m: string, s?: { hash: string }, receipt?: boolean) => Promise<void> }) {
   const { crumena, signer } = useApp();
   const [open, setOpen] = useState(false);
   const [upTo, setUpTo] = useState(p.limit > 0n ? units(p.limit, pot.decimals) : "");
@@ -501,7 +506,7 @@ function LimitEditor({ pot, p, onDone }: { pot: Pot; p: Payee; onDone: (m: strin
   );
 }
 
-function PayeeList({ pot, payees, isFunder, onDone }: { pot: Pot; payees: Payee[]; isFunder: boolean; onDone: (m: string, s?: { hash: string }) => Promise<void> }) {
+function PayeeList({ pot, payees, isFunder, onDone }: { pot: Pot; payees: Payee[]; isFunder: boolean; onDone: (m: string, s?: { hash: string }, receipt?: boolean) => Promise<void> }) {
   const { toast } = useApp();
   return (
     <div className="card stack">
@@ -618,7 +623,7 @@ function Activity({ pot, entries, nameOf }: { pot: Pot; entries?: Entry[]; nameO
       ) : (
         <ul className="timeline">
           {entries.map((e) => (
-            <HistoryItem key={`${e.tx}-${e.kind}-${e.block}`} e={e} text={describe(e, pot, nameOf)} />
+            <HistoryItem key={`${e.tx}-${e.kind}-${e.block}`} e={e} text={describe(e, pot, nameOf)} receipt={e.kind === "Paid" ? `#/r/${potCode(pot.vault)}/${e.tx}` : undefined} />
           ))}
         </ul>
       )}
@@ -644,7 +649,7 @@ const ICON: Record<string, string> = {
 };
 const IN = new Set(["Deposit", "BankDeposit"]);
 
-function HistoryItem({ e, text }: { e: Entry; text: string }) {
+function HistoryItem({ e, text, receipt }: { e: Entry; text: string; receipt?: string }) {
   const { crumena } = useApp();
   const [v, setV] = useState<Verification | "busy" | string>();
   return (
@@ -661,6 +666,7 @@ function HistoryItem({ e, text }: { e: Entry; text: string }) {
           </div>
         </div>
         <span className="row small" style={{ flexWrap: "nowrap" }}>
+          {receipt && <a href={receipt}>Receipt</a>}
           <ExplorerLink tx={e.tx}>Explorer</ExplorerLink>
           {SIGNED.has(e.kind) && (
             <button

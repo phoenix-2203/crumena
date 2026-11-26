@@ -5,13 +5,14 @@ import { Home } from "./pages/Home";
 import { NewPot } from "./pages/NewPot";
 import { PotByCode, PotPage } from "./pages/PotPage";
 import { Pots } from "./pages/Pots";
+import { Receipt } from "./pages/Receipt";
 import { AppProvider, useApp, useRoute } from "./state";
 import "./fonts";
 import "./styles.css";
 import { Layout } from "./ui";
 
 function Routes() {
-  const [page, arg] = useRoute();
+  const [page, arg, arg2] = useRoute();
   const { loadError } = useApp();
   if (loadError) return <p className="error">{loadError}</p>;
   switch (page) {
@@ -25,6 +26,8 @@ function Routes() {
       return <NewPot />;
     case "pot":
       return arg && /^\d+$/.test(arg) ? <PotPage key={arg} id={BigInt(arg)} /> : <p>That isn't a pot number.</p>;
+    case "r":
+      return arg && arg2 ? <Receipt key={arg2} code={arg} tx={arg2} /> : <p>That receipt link isn't complete.</p>;
     case "p":
       return arg ? <PotByCode key={arg} code={arg} /> : <p>That link is missing its code.</p>;
     default:

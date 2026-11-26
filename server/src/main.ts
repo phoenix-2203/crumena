@@ -12,7 +12,7 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import { existsSync, readFileSync } from "node:fs";
 import { getAddress, type Hex } from "viem";
-import { CHAIN_ID, EVM_CHAIN_ID, EVM_RPC, FUSD, REST, bankBalance, cosmosHashOf, publicClient, useAccount } from "./chain";
+import { CHAIN_ID, EVM_CHAIN_ID, EVM_RPC, FUSD, REST, bankBalance, cosmosHashOf, hasPqcKey, publicClient, registerPqcKey, useAccount } from "./chain";
 import { createActivityIndex } from "./activity";
 import { createDemo } from "./demo";
 import { createDepositIndex } from "./deposits";
@@ -41,6 +41,28 @@ deposits.start();
 const activity = createActivityIndex({ crumena: CRUMENA, fromBlock: BigInt(deployment?.block ?? 0), log: console.log });
 activity.start();
 
+// The relayer's own ML-DSA-87 key must be registered before it can sign anything (QoreChain requires the
+// hybrid signature once a key exists, and EVM windows need it). A fresh relayer registers it as soon as it
+// has gas for the fee; until then the relay and the demo answer "not ready".
+let relayerReady = false;
+void (async () => {
+  for (;;) {
+    try {
+      if (!(await hasPqcKey(account.qor))) {
+        const tx = await relayer.exclusive(() => registerPqcKey(account.unified));
+        console.log(`registered the relayer's ML-DSA-87 key: ${tx}`);
+        await new Promise((r) => setTimeout(r, 3000));
+      }
+      relayerReady = true;
+      return;
+    } catch (e) {
+      console.log(`relayer key not registered yet (fund ${account.qor} with test QOR): ${(e as Error).message}`);
+      await new Promise((r) => setTimeout(r, 30_000));
+    }
+  }
+})();
+const notReady = { error: "The relayer is still setting up (it needs test QOR for its first transaction). Try again in a minute." };
+
 const demo = createDemo({ relayer: account, crumena: CRUMENA, exclusive: relayer.exclusive });
 const clientIp = (h: (n: string) => string | undefined) => h("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
 
@@ -55,6 +77,7 @@ app.get("/api/health", async (c) => {
   return c.json({
     relayer: account.qor,
     gasQor: Number(uqor) / 1e6,
+    ready: relayerReady,
     window: w && { live: w.live, remainingTxs: w.remainingTxs.toString(), remainingBlocks: w.remainingBlocks.toString(), allowedTargets: w.allowedTargets },
   });
 });
@@ -70,6 +93,7 @@ function limited(ip: string): boolean {
 }
 
 app.post("/api/relay", async (c) => {
+  if (!relayerReady) return c.json(notReady, 503);
   const ip = clientIp((n) => c.req.header(n));
   if (limited(ip)) return c.json({ error: "Too many requests. Wait a minute." }, 429);
   const body = (await c.req.json().catch(() => null)) as { data?: string } | null;
@@ -120,6 +144,7 @@ app.get("/api/qorechain-tx/:hash", async (c) => {
 
 // The two-minute demo: three throwaway testnet people with registered ML-DSA-87 keys.
 app.post("/api/demo/start", async (c) => {
+  if (!relayerReady) return c.json(notReady, 503);
   const refused = demo.allow(clientIp((n) => c.req.header(n)));
   if (refused) return c.json({ error: refused }, 429);
   try {

@@ -13,6 +13,7 @@ import { Hono } from "hono";
 import { existsSync, readFileSync } from "node:fs";
 import { getAddress, type Hex } from "viem";
 import { CHAIN_ID, EVM_CHAIN_ID, EVM_RPC, FUSD, REST, bankBalance, cosmosHashOf, publicClient, useAccount } from "./chain";
+import { createActivityIndex } from "./activity";
 import { createDemo } from "./demo";
 import { createDepositIndex } from "./deposits";
 import { RelayError, createRelayer } from "./relay";
@@ -36,6 +37,8 @@ const deployedAt = deployment?.block
   : new Date(Date.now() - 7 * 86_400_000);
 const deposits = createDepositIndex({ since: deployedAt, log: console.log });
 deposits.start();
+const activity = createActivityIndex({ crumena: CRUMENA, fromBlock: BigInt(deployment?.block ?? 0), log: console.log });
+activity.start();
 
 const demo = createDemo({ relayer: account, crumena: CRUMENA, exclusive: relayer.exclusive });
 const clientIp = (h: (n: string) => string | undefined) => h("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
@@ -86,6 +89,21 @@ app.get("/api/deposits/:vault", (c) => {
   } catch {
     return c.json({ error: "Not an address." }, 400);
   }
+});
+
+// A pot's history, newest first: Crumena's events, fUSD transfers in, and bank-lane deposits.
+app.get("/api/pot/:id/activity", (c) => {
+  const id = c.req.param("id");
+  if (!/^\d{1,9}$/.test(id)) return c.json({ error: "Not a pot number." }, 400);
+  const entries: unknown[] = [...activity.of(id)];
+  const created = activity.of(id).find((e) => e.kind === "PotCreated");
+  if (created) {
+    for (const d of deposits.of(String(created.args.vault))) {
+      entries.push({ kind: "BankDeposit", potId: id, block: d.height, time: Math.floor(Date.parse(d.time) / 1000), tx: d.tx, logIndex: 0, args: { from: d.from, amount: d.amount } });
+    }
+  }
+  (entries as { block: number; logIndex: number }[]).sort((a, b) => b.block - a.block || b.logIndex - a.logIndex);
+  return c.json({ syncedTo: Number(activity.syncedTo), entries });
 });
 
 // The QoreChain hash of an EVM transaction: what the explorer links by.

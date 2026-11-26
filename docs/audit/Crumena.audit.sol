@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// Crumena, as audited by QCAI: the four source files below joined into one, unchanged except that
-// their import, pragma and licence lines are dropped (they are all in this one file).
+// Crumena v3 (per-payee limits, request amounts, link codes), for the QCAI audit: the four source files
+// below joined into one, unchanged except that their import, pragma and licence lines are dropped.
 // Sources: contracts/src/lib/Text.sol, contracts/src/lib/Pqc.sol, contracts/src/PotVault.sol, contracts/src/Crumena.sol
 
 // ===================================================================== contracts/src/lib/Text.sol
+
 /// @title Text
 /// @notice The small amount of formatting needed to rebuild, byte for byte, the
 ///         plain-text statements people sign in QoreX: numbers, token amounts,
@@ -152,6 +153,7 @@ library Text {
 }
 
 // ===================================================================== contracts/src/lib/Pqc.sol
+
 /// @title Pqc
 /// @notice Checks ML-DSA-87 signatures against the key an account registered on
 ///         QoreChain, using the chain's post-quantum precompiles:
@@ -240,6 +242,7 @@ library Pqc {
 }
 
 // ===================================================================== contracts/src/PotVault.sol
+
 /// @title PotVault
 /// @notice Holds one pot's money. Anyone can pay into it with an ordinary token
 ///         transfer (it is just an address), and only the Crumena contract that
@@ -264,6 +267,8 @@ contract PotVault {
 }
 
 // ===================================================================== contracts/src/Crumena.sol
+
+
 /// @title Crumena
 /// @notice Money with a purpose. A funder puts money in a pot for someone (the
 ///         recipient) and names who it may be paid to (the payees). The recipient
@@ -277,8 +282,9 @@ contract PotVault {
 ///         nobody can change it. A stolen classical (ECDSA) key signs nothing here.
 ///
 ///         The funder can also set spending rules (a cap per payment, a limit per
-///         period, such as 200 a week) and freeze the pot at once if something looks
-///         wrong; each of those is a signed statement too.
+///         period, such as 200 a week), cap what each payee may receive in total, and
+///         freeze the pot at once if something looks wrong; each of those is a signed
+///         statement too.
 ///
 ///         Each pot's money sits in its own vault, an address anyone can pay into.
 ///         There is no owner, no admin key, no fee and no upgrade.
@@ -311,6 +317,9 @@ contract Crumena {
         bool confirmed; // the payee signed with its own post-quantum key that the address is theirs
         bool requested; // the recipient asked the funder to approve it
         string name;
+        uint256 limit; // most the pot may pay this payee in total (0: no limit beyond the pot's rules)
+        uint256 paid; // paid to this payee so far, by this pot
+        uint256 asked; // the amount the recipient said it wants to pay, when it asked for approval
     }
 
     /// @notice Spending rules. Zero means no rule. A period limit needs a period length.
@@ -331,6 +340,7 @@ contract Crumena {
         string purpose;
         address[] payees;
         string[] names;
+        uint256[] limits; // per payee, most it may receive in total (0: no limit)
     }
 
     /// @notice The signature part of every action: the signer's next nonce, a deadline,
@@ -366,6 +376,10 @@ contract Crumena {
     mapping(address => uint256) public nonceOf; // next nonce each signer must use
     mapping(address => uint256[]) private _potsOf; // pots an address funds or spends
     mapping(address => uint256) public potOfVault;
+    /// @notice A pot's short link code: the first 8 bytes of its vault address. Not secret
+    ///         (everything about a pot is public on chain), just not a counter. The first
+    ///         pot to get a code keeps it; the app checks a code against the pot's vault.
+    mapping(bytes8 => uint256) public potOfCode;
 
     // ----------------------------------------------------------------- events
 
@@ -379,9 +393,10 @@ contract Crumena {
         bool confirmedOnly,
         string purpose
     );
-    event PayeeApproved(uint256 indexed potId, address indexed payee, string name);
+    event PayeeApproved(uint256 indexed potId, address indexed payee, string name, uint256 limit);
     event PayeeRemoved(uint256 indexed potId, address indexed payee);
-    event PayeeRequested(uint256 indexed potId, address indexed payee, string name);
+    event PayeeRequested(uint256 indexed potId, address indexed payee, string name, uint256 amount);
+    event PayeeLimitChanged(uint256 indexed potId, address indexed payee, uint256 limit);
     event PayeeConfirmed(uint256 indexed potId, address indexed payee);
     event Paid(uint256 indexed potId, address indexed payee, uint256 amount, string memo, address indexed by);
     event EndChanged(uint256 indexed potId, uint64 endsAt);
@@ -418,6 +433,7 @@ contract Crumena {
     error OverPaymentLimit(uint256 limit);
     error OverPeriodLimit(uint256 remaining);
     error NoChange();
+    error OverPayeeLimit(uint256 remaining);
 
     constructor(string memory chainName_, uint256 evmChainId_) {
         if (block.chainid != evmChainId_) revert WrongChain();
@@ -451,6 +467,8 @@ contract Crumena {
         pot.symbol = symbol;
         pot.purpose = p.purpose;
         potOfVault[vault] = potId;
+        bytes8 code = bytes8(bytes20(vault));
+        if (potOfCode[code] == 0) potOfCode[code] = potId;
         _potsOf[p.funder].push(potId);
         if (p.recipient != p.funder) _potsOf[p.recipient].push(potId);
 
@@ -458,7 +476,7 @@ contract Crumena {
         if (p.rules.maxPerPayment != 0 || p.rules.periodDays != 0) {
             emit RulesChanged(potId, p.rules.maxPerPayment, p.rules.periodLimit, p.rules.periodDays);
         }
-        for (uint256 i; i < p.payees.length; ++i) _approve(potId, p.payees[i], p.names[i]);
+        for (uint256 i; i < p.payees.length; ++i) _approve(potId, p.payees[i], p.names[i], p.limits[i]);
     }
 
     /// @notice Pay an approved payee from the pot. Signed by the recipient or the funder.
@@ -474,6 +492,7 @@ contract Crumena {
         if (amount == 0) revert ZeroAmount();
         if (pot.frozen) revert PotFrozen();
         if (pot.maxPerPayment != 0 && amount > pot.maxPerPayment) revert OverPaymentLimit(pot.maxPerPayment);
+        if (p.limit != 0 && p.paid + amount > p.limit) revert OverPayeeLimit(p.limit > p.paid ? p.limit - p.paid : 0);
         (uint64 period, uint256 spent) = _periodSpent(pot);
         if (pot.periodDays != 0 && spent + amount > pot.periodLimit) revert OverPeriodLimit(pot.periodLimit - spent);
         Text.requirePrintableOrEmpty(memo, MAX_MEMO);
@@ -486,15 +505,30 @@ contract Crumena {
             pot.spentInPeriod = spent + amount;
         }
         pot.paidOut += amount;
+        p.paid += amount;
         emit Paid(potId, payee, amount, memo, signer);
         PotVault(pot.vault).send(pot.token, payee, amount);
     }
 
-    /// @notice Approve a payee. Signed by the funder.
-    function addPayee(uint256 potId, address payee, string calldata name, Auth calldata a) external {
+    /// @notice Approve a payee, up to `limit` in total (0: no limit beyond the pot's
+    ///         rules). Signed by the funder.
+    function addPayee(uint256 potId, address payee, string calldata name, uint256 limit, Auth calldata a) external {
         Pot storage pot = _openPot(potId);
-        _authorize(pot.funder, addPayeeStatement(potId, payee, name, a.nonce, a.validUntil), a);
-        _approve(potId, payee, name);
+        _authorize(pot.funder, addPayeeStatement(potId, payee, name, limit, a.nonce, a.validUntil), a);
+        _approve(potId, payee, name, limit);
+    }
+
+    /// @notice Change the most an approved payee may receive in total (0: no limit beyond
+    ///         the pot's rules). What it was already paid still counts. Signed by the funder.
+    function setPayeeLimit(uint256 potId, address payee, uint256 limit, Auth calldata a) external {
+        Pot storage pot = _openPot(potId);
+        Payee storage p = _payees[potId][payee];
+        if (!p.approved) revert NotApproved();
+        if (p.limit == limit) revert NoChange();
+        _authorize(pot.funder, payeeLimitStatement(potId, payee, limit, a.nonce, a.validUntil), a);
+        p.limit = limit;
+        p.asked = 0;
+        emit PayeeLimitChanged(potId, payee, limit);
     }
 
     /// @notice Stop paying a payee. Signed by the funder.
@@ -510,17 +544,21 @@ contract Crumena {
 
     /// @notice Ask the funder to approve a payee. Signed by the recipient. The funder
     ///         approves it with addPayee; until then the pot can't pay it.
-    function requestPayee(uint256 potId, address payee, string calldata name, Auth calldata a) external {
+    function requestPayee(uint256 potId, address payee, string calldata name, uint256 amount, Auth calldata a)
+        external
+    {
         Pot storage pot = _openPot(potId);
         _checkPayeeAddress(pot, payee);
         Text.requirePrintable(name, MAX_NAME);
+        if (amount == 0) revert ZeroAmount();
         Payee storage p = _payees[potId][payee];
         if (p.approved) revert AlreadyApproved();
-        _authorize(pot.recipient, requestPayeeStatement(potId, payee, name, a.nonce, a.validUntil), a);
+        _authorize(pot.recipient, requestPayeeStatement(potId, payee, name, amount, a.nonce, a.validUntil), a);
         _list(potId, payee);
         p.requested = true;
         p.name = name;
-        emit PayeeRequested(potId, payee, name);
+        p.asked = amount;
+        emit PayeeRequested(potId, payee, name, amount);
     }
 
     /// @notice A payee confirms, with its own post-quantum key, that it controls the
@@ -619,7 +657,16 @@ contract Crumena {
             "\nPayees:"
         );
         for (uint256 i; i < p.payees.length; ++i) {
-            s = string.concat(s, "\n", Text.decimal(i + 1), ". ", p.names[i], ", ", Text.hexAddress(p.payees[i]));
+            s = string.concat(
+                s,
+                "\n",
+                Text.decimal(i + 1),
+                ". ",
+                p.names[i],
+                ", ",
+                Text.hexAddress(p.payees[i]),
+                p.limits[i] == 0 ? ", no limit" : string.concat(", up to ", Text.units(p.limits[i], decimals), " ", symbol)
+            );
         }
         return string.concat(s, "\nPot address: ", Text.hexAddress(vaultFor(p.funder, nonce)), _footer(p.funder, nonce, validUntil));
     }
@@ -653,11 +700,14 @@ contract Crumena {
         );
     }
 
-    function addPayeeStatement(uint256 potId, address payee, string calldata name, uint256 nonce, uint64 validUntil)
-        public
-        view
-        returns (string memory)
-    {
+    function addPayeeStatement(
+        uint256 potId,
+        address payee,
+        string calldata name,
+        uint256 limit,
+        uint256 nonce,
+        uint64 validUntil
+    ) public view returns (string memory) {
         Pot storage pot = _existing(potId);
         return string.concat(
             "Crumena: approve a payee for pot #",
@@ -668,6 +718,28 @@ contract Crumena {
             name,
             "\nAddress: ",
             Text.hexAddress(payee),
+            _limitLines(pot, _payees[potId][payee].paid, limit),
+            _footer(pot.funder, nonce, validUntil)
+        );
+    }
+
+    function payeeLimitStatement(uint256 potId, address payee, uint256 limit, uint256 nonce, uint64 validUntil)
+        public
+        view
+        returns (string memory)
+    {
+        Pot storage pot = _existing(potId);
+        Payee storage p = _payees[potId][payee];
+        return string.concat(
+            "Crumena: change what pot #",
+            Text.decimal(potId),
+            " may pay a payee\nPot: ",
+            pot.purpose,
+            "\nPayee: ",
+            p.name,
+            "\nAddress: ",
+            Text.hexAddress(payee),
+            _limitLines(pot, p.paid, limit),
             _footer(pot.funder, nonce, validUntil)
         );
     }
@@ -691,11 +763,14 @@ contract Crumena {
         );
     }
 
-    function requestPayeeStatement(uint256 potId, address payee, string calldata name, uint256 nonce, uint64 validUntil)
-        public
-        view
-        returns (string memory)
-    {
+    function requestPayeeStatement(
+        uint256 potId,
+        address payee,
+        string calldata name,
+        uint256 amount,
+        uint256 nonce,
+        uint64 validUntil
+    ) public view returns (string memory) {
         Pot storage pot = _existing(potId);
         return string.concat(
             "Crumena: ask the funder to approve a payee for pot #",
@@ -706,6 +781,10 @@ contract Crumena {
             name,
             "\nAddress: ",
             Text.hexAddress(payee),
+            "\nAmount: ",
+            Text.units(amount, pot.decimals),
+            " ",
+            pot.symbol,
             _footer(pot.recipient, nonce, validUntil)
         );
     }
@@ -889,6 +968,15 @@ contract Crumena {
         return string.concat("\nLimit per payment: ", perPayment, "\nLimit per period: ", perPeriod);
     }
 
+    /// @dev "Up to: 30 fUSD in total" (or "no limit"), and what was already paid, if anything.
+    function _limitLines(Pot storage pot_, uint256 paid, uint256 limit) internal view returns (string memory) {
+        return string.concat(
+            "\nUp to: ",
+            limit == 0 ? "no limit" : string.concat(Text.units(limit, pot_.decimals), " ", pot_.symbol, " in total"),
+            paid == 0 ? "" : string.concat("\nAlready paid: ", Text.units(paid, pot_.decimals), " ", pot_.symbol)
+        );
+    }
+
     function _footer(address signer, uint256 nonce, uint64 validUntil) internal view returns (string memory) {
         return string.concat(
             "\nSigned by: ",
@@ -904,7 +992,7 @@ contract Crumena {
         );
     }
 
-    function _approve(uint256 potId, address payee_, string memory name) internal {
+    function _approve(uint256 potId, address payee_, string memory name, uint256 limit) internal {
         Pot storage pot_ = _pots[potId];
         _checkPayeeAddress(pot_, payee_);
         Text.requirePrintable(name, MAX_NAME);
@@ -914,7 +1002,9 @@ contract Crumena {
         p.approved = true;
         p.requested = false;
         p.name = name;
-        emit PayeeApproved(potId, payee_, name);
+        p.limit = limit;
+        p.asked = 0;
+        emit PayeeApproved(potId, payee_, name, limit);
     }
 
     function _list(uint256 potId, address payee_) internal {
@@ -936,7 +1026,10 @@ contract Crumena {
         if (p.endsAt <= block.timestamp) revert BadEnd();
         Text.requirePrintable(p.purpose, MAX_PURPOSE);
         _checkRules(p.rules);
-        if (p.payees.length == 0 || p.payees.length > MAX_PAYEES_AT_CREATION || p.names.length != p.payees.length) {
+        if (
+            p.payees.length == 0 || p.payees.length > MAX_PAYEES_AT_CREATION || p.names.length != p.payees.length
+                || p.limits.length != p.payees.length
+        ) {
             revert TooManyPayees();
         }
         for (uint256 i; i < p.payees.length; ++i) {

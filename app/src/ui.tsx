@@ -29,6 +29,7 @@ export function toSection(id: string) {
 
 const SECTIONS = [
   ["How it works", "how"],
+  ["Who's who", "roles"],
   ["Security", "security"],
   ["Proof", "proof"],
 ] as const;
@@ -97,7 +98,7 @@ export function Layout({ children }: { children: ReactNode }) {
             <span>Act as</span>
             {(["funder", "spender", "shop"] as const).map((r) => (
               <button key={r} aria-pressed={signer?.demo === r} onClick={() => actAs(r)}>
-                {r === "funder" ? "Funder" : r === "spender" ? "Spender" : "Vendor"}
+                {r === "funder" ? "Funder" : r === "spender" ? "Spender" : "Payee"}
               </button>
             ))}
             <span style={{ flex: 1 }} />
@@ -219,7 +220,7 @@ function StatementModal() {
         </div>
         <div className="row">
           <button className="btn primary" autoFocus onClick={() => pending.resolve(true)}>
-            {signer?.demo ? `Sign as ${signer.demo === "shop" ? "vendor" : signer.demo}` : "Sign in QoreX"}
+            {signer?.demo ? `Sign as ${signer.demo === "shop" ? "payee" : signer.demo}` : "Sign in QoreX"}
           </button>
           <button className="btn ghost" onClick={() => pending.resolve(false)}>
             Cancel

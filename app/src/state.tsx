@@ -39,7 +39,7 @@ export const useApp = () => {
   return v;
 };
 
-const ROLE_LABEL: Record<Role, string> = { funder: "Demo: the funder", spender: "Demo: the spender", shop: "Demo: the vendor" };
+const ROLE_LABEL: Record<Role, string> = { funder: "Demo: the funder", spender: "Demo: the spender", shop: "Demo: the payee" };
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [config, setConfig] = useState<Config>();

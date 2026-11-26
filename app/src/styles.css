@@ -289,21 +289,21 @@ footer.site a:hover { color: var(--ink); }
 .trust { display: flex; flex-wrap: wrap; gap: 8px 26px; list-style: none; padding: 0; margin: 40px 0 0; font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .trust li::before { content: ""; display: inline-block; width: 5px; height: 5px; border-radius: 5px; background: var(--mark); margin-right: 9px; vertical-align: 2px; }
 
-.scene { position: relative; height: 600px; }
+.scene { position: relative; height: 660px; }
 .scene-receipt, .scene-pot, .scene-chip { position: absolute; background: var(--surface); border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow), 0 50px 90px -50px rgba(0, 0, 0, 0.45); }
-.scene-receipt { top: 0; right: -6px; width: 320px; padding: 18px 20px; transform: rotate(2.5deg); }
+.scene-receipt { top: 0; right: -6px; width: 330px; padding: 18px 20px; transform: rotate(2deg); }
 .scene-receipt pre { font-family: var(--mono); font-size: 0.78rem; line-height: 1.7; margin: 12px 0; white-space: pre; color: var(--ink); }
 .scene-receipt .seal { color: var(--ink); border: 1px solid var(--line); padding: 3px 9px; border-radius: 99px; }
-.scene-pot { left: 0; top: 108px; width: 420px; padding: 22px; animation: rise 0.7s 0.15s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.scene-pot { left: 0; top: 196px; width: 420px; padding: 22px; animation: rise 0.7s 0.15s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 .scene-title { font-size: 1.08rem; font-weight: 500; letter-spacing: -0.02em; margin-top: 2px; }
 .scene-amt { display: flex; align-items: baseline; gap: 10px; margin: 20px 0 14px; }
 .scene-amt .num { font-family: var(--serif); font-size: 3.6rem; letter-spacing: -0.02em; line-height: 1; }
 .scene-ev { padding: 12px 0 0; margin-top: 12px; border-top: 1px solid var(--line); }
-.scene-chip { left: 170px; bottom: 0; padding: 10px 16px; border-radius: 999px; font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.03em; display: flex; align-items: center; gap: 9px; white-space: nowrap; }
+.scene-chip { left: 200px; bottom: 0; padding: 10px 16px; border-radius: 999px; font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.03em; display: flex; align-items: center; gap: 9px; white-space: nowrap; }
 .ok-dot { width: 14px; height: 14px; border-radius: 14px; background: #2f9e64; box-shadow: 0 0 0 4px rgba(47, 158, 100, 0.2); }
 @media (max-width: 1060px) {
   .home-hero { grid-template-columns: 1fr; padding-top: 48px; }
-  .scene { height: 540px; max-width: 520px; }
+  .scene { height: 660px; max-width: 520px; }
 }
 @media (max-width: 560px) {
   .scene { height: auto; }
@@ -459,3 +459,23 @@ footer.site a:hover { color: var(--ink); }
   .receipt { box-shadow: none; border-color: #ccc; }
   .reveal { animation: none; }
 }
+
+/* ---------- roles and guide ---------- */
+.roles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.role { position: relative; overflow: hidden; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 28px 26px 22px; box-shadow: var(--shadow); display: flex; flex-direction: column; }
+.role::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--grad); }
+.role-n { font-family: var(--mono); font-size: 0.78rem; color: var(--mark); }
+.role h3 { font-family: var(--serif); font-weight: 400; font-size: 2rem; letter-spacing: -0.02em; margin: 14px 0 6px; }
+.role-who { color: var(--muted); margin-bottom: 16px; }
+.role ul { list-style: none; margin: 0 0 18px; padding: 0; display: grid; gap: 8px; }
+.role li { position: relative; padding-left: 20px; font-size: 0.95rem; }
+.role li::before { content: ""; position: absolute; left: 2px; top: 0.6em; width: 8px; height: 8px; border-radius: 8px; background: var(--grad); }
+.role-cant { margin: auto 0 0; padding-top: 14px; border-top: 1px dashed var(--line); font-size: 0.9rem; color: var(--ink-2); display: grid; gap: 4px; }
+@media (max-width: 960px) { .roles { grid-template-columns: 1fr; } }
+.guide { list-style: none; margin: 0; padding: 0; position: relative; }
+.guide::before { content: ""; position: absolute; left: 19px; top: 20px; bottom: 20px; width: 1px; background: linear-gradient(var(--mark), var(--line)); }
+.guide li { position: relative; display: grid; grid-template-columns: 40px 1fr; gap: 18px; padding: 0 0 26px; }
+.guide-n { width: 40px; height: 40px; border-radius: 40px; display: grid; place-items: center; background: var(--surface); border: 1px solid var(--line); font-family: var(--serif); font-size: 1.15rem; position: relative; z-index: 1; }
+.guide li:first-child .guide-n { background: var(--btn); color: var(--btn-ink); border-color: var(--btn); }
+.guide h3 { margin: 8px 0 4px; font-size: 1.15rem; }
+.guide p { margin: 0; }

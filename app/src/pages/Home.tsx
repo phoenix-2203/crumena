@@ -6,15 +6,45 @@ import { go, useApp } from "../state";
 import { EXPLORER, ExplorerLink, Mark } from "../ui";
 
 const STEPS = [
-  ["Fill a pot", "Say what it's for, who spends it, which vendors can be paid and the limits. Then pay into the pot's own address."],
-  ["They spend it, within your rules", "The spender pays approved vendors only, up to your caps. No gas and no crypto knowledge: they read a sentence and sign it."],
+  ["Fill a pot", "Say what it's for, who spends it, who can be paid and how much, and the limits. Then pay into the pot's own address."],
+  ["They spend it, within your rules", "The spender pays approved payees only, up to the amounts and caps you set. No gas and no crypto knowledge: they read a sentence and sign it."],
   ["The rest comes back", "After the end date, whatever is left returns to you. Anyone can trigger it, and it can only go to you."],
 ] as const;
 
+const ROLES = [
+  {
+    role: "Funder",
+    who: "The person who puts the money in and sets the rules.",
+    does: ["Creates the pot and says what it's for", "Approves payees, each up to an amount", "Sets caps per payment and per day, week or month", "Can freeze the pot at once, or end it early"],
+    cant: "Take the money back before the end date, or pay anyone outside the rules.",
+  },
+  {
+    role: "Spender",
+    who: "The person the money is for. They decide when to pay and how much.",
+    does: ["Pays approved payees, within the limits", "Asks the funder to approve someone new, with an amount", "Needs no gas and no crypto: they read a sentence and sign it"],
+    cant: "Pay anyone else, go over a limit, or keep the money.",
+  },
+  {
+    role: "Payee",
+    who: "Anyone the pot may pay: a vendor, a supplier, a landlord, a service.",
+    does: ["Receives payments straight to their own address", "Can confirm with their own key that the address is theirs", "Gets a receipt for every payment"],
+    cant: "Receive more than the funder approved for them.",
+  },
+] as const;
+
+const GUIDE = [
+  ["The funder creates a pot", "Purpose, spender, payees (each with an amount, or no limit), caps and an end date. They read the full statement and sign it."],
+  ["The funder pays in", "The pot has its own address. Anyone can add money to it: from QoreX, or straight from a bank balance."],
+  ["The spender pays a payee", "They pick an approved payee and an amount. The contract checks the signature, the payee, their limit, the caps and the balance."],
+  ["Someone new? The spender asks", "They ask the funder to approve a new payee, with the amount they need. The funder approves that, or an amount of their choice."],
+  ["Every payment gets a receipt", "With the signed statement and a check of its ML-DSA-87 signature that anyone can run in their own browser."],
+  ["What's left comes back", "After the end date the rest returns to the funder. The funder can also give it to the spender early, or freeze the pot."],
+] as const;
+
 const USES = [
-  ["Budgets", "A budget that can only pay the vendors you approve, capped per payment."],
+  ["Budgets", "A budget that can only pay the payees you approve, each up to an amount."],
   ["Allowances", "A fixed amount each week or month, spendable only where you allow."],
-  ["Grants", "Approve the vendors up front; the recipient buys what's needed, with a record of every payment."],
+  ["Grants", "Approve the payees up front; the recipient buys what's needed, with a record of every payment."],
   ["Group funds", "Several people pay into one pot; it only pays out for the purpose everyone agreed."],
 ] as const;
 
@@ -28,8 +58,9 @@ const SECURITY = [
 
 const FAQ = [
   ["Does the spender need crypto or gas?", "No. They read the statement and sign it with their key. Crumena's relayer submits the transaction and pays the gas, and it can't change what was signed."],
-  ["What stops someone paying a vendor the funder didn't approve?", "The contract. It only pays addresses on the pot's approved list, within the pot's limits. In the live run, a properly signed payment to an unapproved address was refused."],
+  ["What stops someone paying a payee the funder didn't approve, or paying too much?", "The contract. It only pays addresses on the pot's approved list, each up to the amount the funder approved, within the pot's caps. In the live run, a properly signed payment to an unapproved address was refused."],
   ["Why post-quantum signatures?", "A large enough quantum computer could forge today's ordinary signatures. ML-DSA-87 is the NIST post-quantum standard, and QoreChain checks it on chain."],
+  ["Is a payee the same as a vendor?", "A vendor is one kind of payee. A payee is anyone the pot may pay: a supplier, a shop, a landlord, a service provider. The funder approves each one, up to an amount."],
   ["Is this real money?", "It runs on QoreChain testnet with fUSD, a test token with no value. The demo gives you three test people with real post-quantum keys."],
 ] as const;
 
@@ -53,7 +84,7 @@ export function Home() {
             Money for <span className="line">one purpose.</span>
           </h1>
           <p className="lead">
-            Fill a pot for someone. They pay only the vendors you approve, within the limits you set. Whatever is left comes back to you.
+            Fill a pot for someone. They pay only the payees you approve, up to the amounts you set. Whatever is left comes back to you.
           </p>
           <div className="row">
             <a className="btn primary big" href="#/demo">
@@ -112,6 +143,56 @@ export function Home() {
               <span className="step-n">0{i + 1}</span>
               <h3>{t}</h3>
               <p className="muted">{d}</p>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <section id="roles" className="section">
+        <div className="section-head">
+          <span className="label">Who's who</span>
+          <h2>Three people, each with their own key.</h2>
+          <p className="muted" style={{ maxWidth: 640 }}>
+            A pot always has a funder and a spender, and one or more payees. Each of them signs only what they're allowed to, with their own post-quantum key.
+          </p>
+        </div>
+        <div className="roles">
+          {ROLES.map((r, i) => (
+            <article key={r.role} className="role">
+              <span className="role-n">0{i + 1}</span>
+              <h3>{r.role}</h3>
+              <p className="role-who">{r.who}</p>
+              <ul>
+                {r.does.map((d) => (
+                  <li key={d}>{d}</li>
+                ))}
+              </ul>
+              <p className="role-cant">
+                <span className="label">Can't</span>
+                {r.cant}
+              </p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section id="guide" className="section split">
+        <div className="section-head sticky">
+          <span className="label">Guide</span>
+          <h2>A pot's life, step by step.</h2>
+          <p className="muted">From the first signature to the last cent. The demo walks you through all of it with three test people.</p>
+          <a className="btn" href="#/demo">
+            Try it yourself <span className="arrow" aria-hidden>→</span>
+          </a>
+        </div>
+        <ol className="guide">
+          {GUIDE.map(([t, d], i) => (
+            <li key={t}>
+              <span className="guide-n">{i + 1}</span>
+              <div>
+                <h3>{t}</h3>
+                <p className="muted">{d}</p>
+              </div>
             </li>
           ))}
         </ol>
@@ -296,7 +377,7 @@ Pot left after: 37.50 fUSD`}</pre>
           </div>
           <div>
             <span>Approved</span>
-            <b>3 vendors</b>
+            <b>3 payees</b>
           </div>
         </div>
         <div className="ev scene-ev">

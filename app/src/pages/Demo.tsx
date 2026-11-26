@@ -23,8 +23,8 @@ export function Demo() {
 
   const STEPS: [string, string][] = [
     ["As the funder", "Create a pot (we fill in the details), sign it, and add 50 test fUSD."],
-    ["As the spender", "Pay the vendor. Then try paying more than the cap: the contract refuses."],
-    ["As the vendor", "Confirm the address is yours, with your own key."],
+    ["As the spender", "Pay the payee. Then try paying more than the cap, or more than the payee's approved amount: the contract refuses."],
+    ["As the payee", "Confirm the address is yours, with your own key. Every payment to you has a receipt."],
     ["As the funder again", "Freeze the pot, or give the rest to the spender. Press Verify on any payment to check its signature yourself."],
   ];
   const ROLE: Record<string, string> = { funder: "Funds the pot and sets the rules", spender: "Spends it, within the rules", shop: "Gets paid" };
@@ -36,7 +36,7 @@ export function Demo() {
         <h1 style={{ marginTop: 14 }}>Try Crumena in two minutes</h1>
         <p className="lead">
           You'll get three test people, each with a real post-quantum (ML-DSA-87) key registered on chain: a <strong>funder</strong>, a <strong>spender</strong>{" "}
-          and a <strong>vendor</strong>. Switch between them at the top of the page.
+          and a <strong>payee</strong> (such as a vendor). Switch between them at the top of the page.
         </p>
       </div>
       <div className="demo-grid">
@@ -61,9 +61,9 @@ export function Demo() {
               <ul className="people">
                 {demo.map((p) => (
                   <li key={p.role}>
-                    <span className="ev-icon">{(p.role === "shop" ? "vendor" : p.role).slice(0, 1).toUpperCase()}</span>
+                    <span className="ev-icon">{(p.role === "shop" ? "payee" : p.role).slice(0, 1).toUpperCase()}</span>
                     <div className="ev-body">
-                      <div style={{ textTransform: "capitalize" }}>{p.role === "shop" ? "vendor" : p.role}</div>
+                      <div style={{ textTransform: "capitalize" }}>{p.role === "shop" ? "payee" : p.role}</div>
                       <div className="ev-meta">{ROLE[p.role]}</div>
                     </div>
                     <Address value={p.evm} qor />
@@ -86,7 +86,7 @@ export function Demo() {
             <>
               <h2>Three people, three real keys</h2>
               <p className="muted">
-                Starting registers a funder, a spender and a vendor on QoreChain testnet, each with its own ML-DSA-87 key. It takes about 20 seconds.
+                Starting registers a funder, a spender and a payee on QoreChain testnet, each with its own ML-DSA-87 key. It takes about 20 seconds.
               </p>
               <button className="btn primary big" onClick={start} disabled={busy} aria-busy={busy}>
                 {busy ? "Registering three post-quantum keys on testnet… (about 20 seconds)" : "Start the demo"}

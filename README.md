@@ -10,18 +10,18 @@ Built for QoreChain's *Build Before Q-Day* fest, Post-Quantum dApp track.
 
 ## Try it in two minutes
 
-Open the app and press **Try it in two minutes**. You get three test people on QoreChain testnet (a funder, a spender and a shop), each with a real ML-DSA-87 key registered on chain. Switch between them at the top of the page:
+Open the app and press **Try it in two minutes**. You get three test people on QoreChain testnet (a funder, a spender and a vendor), each with a real ML-DSA-87 key registered on chain. Switch between them at the top of the page:
 
 1. **As the funder,** create a pot (the form is filled in for you), read the exact text you're signing, sign it, and add 50 test fUSD.
-2. **As the spender,** pay the shop. Then try paying more than the cap: the contract refuses.
-3. **As the shop,** confirm the address is yours, with your own key.
+2. **As the spender,** pay the vendor. Then try paying more than the cap: the contract refuses.
+3. **As the vendor,** confirm the address is yours, with your own key.
 4. **As the funder,** freeze the pot, change the limits, or give the rest to the spender. Press **Verify** on any payment to check its signature yourself.
 
 No wallet, no sign-up, no gas. With QoreX it's the same, with your own account.
 
 ## Who it's for
 
-Money given for a purpose often isn't spent on it: a parent's school-fees transfer, a company's materials budget for a site manager, a student's weekly allowance, a grant for equipment. Today the funder either trusts the spender or pays every bill personally. Crumena sits in between.
+Money given for a purpose often isn't spent on it: a budget handed to someone else, a weekly allowance, a grant, a fund several people paid into. Today the funder either trusts the spender or pays every bill personally. Crumena sits in between.
 
 | Role | Can | Can't |
 |---|---|---|
@@ -96,9 +96,9 @@ Contract `0xD98320A95030874498b92e9cf66f95F83dDe47af` on `qorechain-diana`, depl
 |---|---|---|
 | ✓ | Funder creates a pot (cap 30 fUSD, 60 fUSD a week), signed with ML-DSA-87, checked by `pqcVerify` | [tx](https://explore.qore.network/tx/5AE33D0B8DF540B5F8E865E77B4788697B0B14C3D7EA1552C891838DE4BFD58D) |
 | ✓ | Funder pays 100 fUSD into the pot's address from the bank lane (`MsgConvertCoin`, hybrid-signed) | [tx](https://explore.qore.network/tx/47137D7E03B2CB46B45A5B6E464232DA32892A4DA40CC855BE6A7F9B2F10B35F) |
-| ✓ | The spender pays an approved shop 25 fUSD; no gas, no transaction of their own | [tx](https://explore.qore.network/tx/91C835422C9A539C72F7D827F86EC32D567198ABFCA87A9C8E9116646AACCE31) |
+| ✓ | The spender pays an approved vendor 25 fUSD; no gas, no transaction of their own | [tx](https://explore.qore.network/tx/91C835422C9A539C72F7D827F86EC32D567198ABFCA87A9C8E9116646AACCE31) |
 | ✓ | The same payment checked off chain: statement and key from the chain, ML-DSA-87 verified; the signature over a changed amount fails | |
-| ✓ | The shop confirms its address with its own key; a new shop is requested, approved and paid | [tx](https://explore.qore.network/tx/148CB9609005DB44ED0F273408BFF059D1524F7FF71A94D7558288A88E037A2A) · [tx](https://explore.qore.network/tx/59BC9C036860C36E13D68757A75189D2FDC9C6FBE912D02B53B7060EA84DE67D) · [tx](https://explore.qore.network/tx/61B90D4B5127A37691A3577FC0AD5EC3EFBC943D2CDFB6BCCDA5979B9A72E0BE) |
+| ✓ | The vendor confirms its address with its own key; a new vendor is requested, approved and paid | [tx](https://explore.qore.network/tx/148CB9609005DB44ED0F273408BFF059D1524F7FF71A94D7558288A88E037A2A) · [tx](https://explore.qore.network/tx/59BC9C036860C36E13D68757A75189D2FDC9C6FBE912D02B53B7060EA84DE67D) · [tx](https://explore.qore.network/tx/61B90D4B5127A37691A3577FC0AD5EC3EFBC943D2CDFB6BCCDA5979B9A72E0BE) |
 | ✓ | A stolen classical key can't open an EVM window: the chain requires the hybrid signature | refused by the chain |
 | ✓ | `addPayee` from the funder's own address without its post-quantum signature | [reverted on chain](https://explore.qore.network/tx/37C1E57DB0F981D06B6A693056673ABCD16F615197447CA0BAB06C66EB9D5D07) |
 | ✓ | The attacker's own registered key; a replay; an unapproved payee; an amount raised after signing | `BadPqcSignature`, `BadNonce`, `NotApproved`, `BadPqcSignature` |

@@ -29,10 +29,11 @@ vi.mock("../src/chain", () => ({
 const { ATTACKS, createChallenge } = await import("../src/challenge");
 const { RelayError } = await import("../src/relay");
 
-function setup(opts: { simulate?: (data: Hex) => Promise<bigint>; withHonest?: boolean } = {}) {
+function setup(opts: { simulate?: (data: Hex) => Promise<bigint>; withHonest?: boolean; savedFor?: Hex | null } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "challenge-"));
   const file = pathToFileURL(join(dir, "challenge.json"));
   const saved = {
+    ...(opts.savedFor === null ? {} : { crumena: opts.savedFor ?? addr(100) }),
     potId: "7",
     vault: addr(9),
     people: Object.fromEntries(Object.keys(PEOPLE).map((k) => [k, k])),
@@ -51,7 +52,7 @@ function setup(opts: { simulate?: (data: Hex) => Promise<bigint>; withHonest?: b
     file,
     log: () => {},
   });
-  return { ch, file, sent, simulated };
+  return { ch, file, dir, sent, simulated };
 }
 const refuse = (reason: string) => async () => {
   throw new RelayError("refused", 400, reason);
@@ -126,6 +127,16 @@ describe("the public challenge", () => {
     expect(call.functionName).toBe("pay");
     expect([call.args[0], call.args[1], call.args[2]]).toEqual([7n, PEOPLE.payee, 10_000n]);
     expect((call.args[5] as { nonce: bigint }).nonce).toBe(3n);
+  });
+
+  it("sets up a new pot when the saved one belongs to another deployment, keeping the old file", async () => {
+    for (const savedFor of [addr(55), null]) {
+      const { ch, dir } = setup({ savedFor });
+      expect(ch.isSetUp()).toBe(false);
+      const kept = JSON.parse(readFileSync(join(dir, `challenge-${savedFor ?? "earlier"}.json`), "utf8"));
+      expect(kept.potId).toBe("7");
+    }
+    expect(setup().ch.isSetUp()).toBe(true);
   });
 
   it("needs an earlier payment before it can replay one", async () => {

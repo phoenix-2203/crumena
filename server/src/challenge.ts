@@ -40,6 +40,7 @@ export const ATTACKS = {
 export type Attack = keyof typeof ATTACKS;
 
 interface Saved {
+  crumena?: Address; // the contract this pot lives in; a pot from another deployment is set up afresh
   potId: string;
   vault: Address;
   people: Record<"funder" | "spender" | "payee" | "capped" | "outsider", string>; // mnemonics (testnet throwaways)
@@ -76,6 +77,14 @@ export function createChallenge(opts: {
   const file = opts.file ?? new URL("../data/challenge.json", import.meta.url);
   const log = opts.log ?? console.log;
   let saved: Saved | undefined = existsSync(file) ? (JSON.parse(readFileSync(file, "utf8")) as Saved) : undefined;
+  if (saved && saved.crumena?.toLowerCase() !== opts.crumena.toLowerCase()) {
+    // A pot from an earlier deployment: keep its file (its throwaway keys) and set up a new one.
+    const old = new URL(`challenge-${saved.crumena ?? "earlier"}.json`, file);
+    writeFileSync(old, readFileSync(file));
+    chmodSync(old, 0o600);
+    log(`challenge: pot #${saved.potId} belongs to ${saved.crumena ?? "an earlier contract"}, not ${opts.crumena}; kept as ${old.pathname.split("/").pop()}, setting up a new one`);
+    saved = undefined;
+  }
   let people: Record<keyof Saved["people"], Account> | undefined;
   let setting = false;
 
@@ -132,7 +141,7 @@ export function createChallenge(opts: {
       const potId = created.potId!;
       const vault = (await read<{ vault: Address }>("potInfo", [BigInt(potId)])).vault;
       await opts.exclusive(() => opts.relayer.native(`challenge: ${FUNDING / FUSD_UNIT} fUSD into pot #${potId}`, [convertFusdMsg(opts.relayer.qor, vault, FUNDING)]));
-      saved = { potId, vault, people: mnemonics, stats: { refused: {}, honest: 0, gotThrough: 0 } };
+      saved = { crumena: opts.crumena, potId, vault, people: mnemonics, stats: { refused: {}, honest: 0, gotThrough: 0 } };
       people = p;
       save();
       log(`challenge pot #${potId} ready at ${vault}`);

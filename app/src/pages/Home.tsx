@@ -40,10 +40,11 @@ const GUIDE = [
 ] as const;
 
 const USES = [
-  ["Budgets", "A budget that can only pay the payees you approve, each up to an amount."],
-  ["Allowances", "A fixed amount each week or month, spendable only where you allow."],
-  ["Grants", "Approve the payees up front; the recipient buys what's needed, with a record of every payment."],
-  ["Group funds", "Several people pay into one pot; it only pays out for the purpose everyone agreed."],
+  ["Money sent home", "Pay the landlord, the school and the hospital. Nothing else, and what isn't spent comes back."],
+  ["Allowances", "The bookshop and the canteen, a weekly limit, and a freeze button if the phone goes missing."],
+  ["Group contributions", "Everyone pays into one pot; only the caterer and the venue get paid out, each up to the quote."],
+  ["Team budgets", "Approved suppliers, a cap per payment, and new ones only with the funder's yes."],
+  ["Grants", "Only the listed services, only until the end date. The rest goes back."],
 ] as const;
 
 const SECURITY = [
@@ -190,7 +191,7 @@ export function Home() {
 
       <section className="section">
         <div className="section-head">
-          <span className="label">What people use it for</span>
+          <span className="label">Who it's for</span>
           <h2>Wherever money has a job to do.</h2>
         </div>
         <div className="uses">

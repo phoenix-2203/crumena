@@ -24,6 +24,7 @@ export const ERROR_TEXT: Record<string, string> = {
   OverPaymentLimit: "That's more than this pot allows in one payment.",
   OverPeriodLimit: "That's more than is left to spend in this period.",
   OverPayeeLimit: "That's more than the funder approved for this payee. Ask the funder to raise the payee's limit.",
+  Reentrant: "The pot was already moving money in this transaction. Try again.",
   NoChange: "Nothing to change: it's already like that.",
   TextTooLong: "That text is empty or too long.",
   TextNotPrintable: "Use plain letters, numbers and punctuation (no line breaks or special characters).",

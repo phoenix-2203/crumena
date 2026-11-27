@@ -8,7 +8,11 @@ import {Crumena} from "../src/Crumena.sol";
 contract RulesTest is Base {
     // ------------------------------------------------------------- helpers
 
-    function _rules(uint256 maxPer, uint256 periodLimit, uint32 periodDays) internal pure returns (Crumena.Rules memory) {
+    function _rules(uint256 maxPer, uint256 periodLimit, uint32 periodDays)
+        internal
+        pure
+        returns (Crumena.Rules memory)
+    {
         return Crumena.Rules({maxPerPayment: maxPer, periodLimit: periodLimit, periodDays: periodDays});
     }
 
@@ -26,7 +30,8 @@ contract RulesTest is Base {
     }
 
     function _setFrozen(uint256 potId, bool frozen) internal {
-        Crumena.Auth memory a = _auth(funder, crumena.frozenStatement(potId, frozen, crumena.nonceOf(funder), _validUntil()));
+        Crumena.Auth memory a =
+            _auth(funder, crumena.frozenStatement(potId, frozen, crumena.nonceOf(funder), _validUntil()));
         vm.prank(relayer);
         crumena.setFrozen(potId, frozen, a);
     }
@@ -173,7 +178,8 @@ contract RulesTest is Base {
     function test_badRulesAreRefusedWhenChanged() public {
         uint256 potId = _fundedPot(10 * FUSD);
         Crumena.Rules memory bad = _rules(0, 10 * FUSD, 0);
-        Crumena.Auth memory a = _auth(funder, crumena.rulesStatement(potId, bad, crumena.nonceOf(funder), _validUntil()));
+        Crumena.Auth memory a =
+            _auth(funder, crumena.rulesStatement(potId, bad, crumena.nonceOf(funder), _validUntil()));
         vm.expectRevert(Crumena.BadRules.selector);
         crumena.setRules(potId, bad, a);
     }
@@ -194,7 +200,8 @@ contract RulesTest is Base {
     function test_freezingTwiceIsRefused() public {
         uint256 potId = _fundedPot(10 * FUSD);
         _setFrozen(potId, true);
-        Crumena.Auth memory a = _auth(funder, crumena.frozenStatement(potId, true, crumena.nonceOf(funder), _validUntil()));
+        Crumena.Auth memory a =
+            _auth(funder, crumena.frozenStatement(potId, true, crumena.nonceOf(funder), _validUntil()));
         vm.expectRevert(Crumena.NoChange.selector);
         crumena.setFrozen(potId, true, a);
     }
@@ -235,9 +242,13 @@ contract RulesTest is Base {
                 _pay(potId, recipient, supplierA, amount, "");
                 paid[period] += amount;
             } else {
-                _expectPayRevert(potId, amount, abi.encodeWithSelector(Crumena.OverPeriodLimit.selector, limit - paid[period]));
+                _expectPayRevert(
+                    potId, amount, abi.encodeWithSelector(Crumena.OverPeriodLimit.selector, limit - paid[period])
+                );
             }
         }
-        for (uint256 p; p < paid.length; ++p) assertLe(paid[p], limit);
+        for (uint256 p; p < paid.length; ++p) {
+            assertLe(paid[p], limit);
+        }
     }
 }

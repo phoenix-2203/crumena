@@ -108,7 +108,10 @@ contract AuditTest is Base {
         Crumena other = new Crumena("qorechain-diana", DIANA);
         uint256 nonce = crumena.nonceOf(recipient);
         string memory st = crumena.payStatement(potId, supplierA, FUSD, "", recipient, nonce, _validUntil());
-        assertTrue(keccak256(bytes(st)) != keccak256(bytes(_otherStatement(other, nonce))), "the contract address is in the text");
+        assertTrue(
+            keccak256(bytes(st)) != keccak256(bytes(_otherStatement(other, nonce))),
+            "the contract address is in the text"
+        );
     }
 
     function _otherStatement(Crumena other, uint256 nonce) internal returns (string memory) {
@@ -117,7 +120,8 @@ contract AuditTest is Base {
         uint256 n = other.nonceOf(funder);
         string memory cs = other.createStatement(p, n, _validUntil());
         vm.prank(relayer);
-        uint256 id = other.createPot(p, Crumena.Auth(n, _validUntil(), MockSig.sign(keyOf[funder], other.signedBytes(cs))));
+        uint256 id =
+            other.createPot(p, Crumena.Auth(n, _validUntil(), MockSig.sign(keyOf[funder], other.signedBytes(cs))));
         return other.payStatement(id, supplierA, FUSD, "", recipient, nonce, _validUntil());
     }
 
@@ -155,7 +159,7 @@ contract AuditTest is Base {
         p.rules = Crumena.Rules({maxPerPayment: 0, periodLimit: FUSD, periodDays: periodDays});
         uint256 potId = _createSigned(p);
         vm.warp(START + elapsed);
-        (, , uint64 resetsAt) = crumena.periodSpending(potId);
+        (,, uint64 resetsAt) = crumena.periodSpending(potId);
         assertGt(resetsAt, START + elapsed);
         assertLe(resetsAt, START + elapsed + uint256(periodDays) * 1 days);
     }
@@ -209,21 +213,25 @@ contract AuditTest is Base {
     function test_qcai4_thePayeeListIsCappedAndNeverGrowsTwiceForOneAddress() public {
         uint256 potId = _fundedPot(10 * FUSD);
         // 2 at creation; add up to the cap of 50
-        for (uint256 i; i < 48; ++i) _addPayee(potId, address(uint160(0xA000 + i)), "Shop");
-        (address[] memory list,) = crumena.payeesOf(potId);
+        for (uint256 i; i < 48; ++i) {
+            _addPayee(potId, address(uint160(0xA000 + i)), "Shop");
+        }
+        (address[] memory list,) = crumena.payeesOf(potId, 0, 50);
         assertEq(list.length, 50);
 
         address extra = address(uint160(0xB000));
-        Crumena.Auth memory a = _auth(funder, crumena.addPayeeStatement(potId, extra, "Shop", 0, crumena.nonceOf(funder), _validUntil()));
+        Crumena.Auth memory a =
+            _auth(funder, crumena.addPayeeStatement(potId, extra, "Shop", 0, crumena.nonceOf(funder), _validUntil()));
         vm.expectRevert(Crumena.TooManyPayees.selector);
         crumena.addPayee(potId, extra, "Shop", 0, a);
 
         // Removing and approving the same address again doesn't add a second entry.
         address again = address(uint160(0xA000));
-        Crumena.Auth memory r = _auth(funder, crumena.removePayeeStatement(potId, again, crumena.nonceOf(funder), _validUntil()));
+        Crumena.Auth memory r =
+            _auth(funder, crumena.removePayeeStatement(potId, again, crumena.nonceOf(funder), _validUntil()));
         crumena.removePayee(potId, again, r);
         _addPayee(potId, again, "Shop");
-        (list,) = crumena.payeesOf(potId);
+        (list,) = crumena.payeesOf(potId, 0, 50);
         assertEq(list.length, 50);
     }
 
@@ -238,7 +246,7 @@ contract AuditTest is Base {
         vm.expectRevert(abi.encodeWithSignature("BadPqcSignature(address)", funder));
         crumena.addPayee(potId, stranger, "Totally legit", 0, a);
         assertFalse(crumena.payeeInfo(potId, stranger).approved);
-        (address[] memory list,) = crumena.payeesOf(potId);
+        (address[] memory list,) = crumena.payeesOf(potId, 0, 50);
         assertEq(list.length, 2);
         assertEq(crumena.nonceOf(funder), nonce);
     }
@@ -282,7 +290,7 @@ contract AuditTest is Base {
         t.mint(crumena.potInfo(potId).vault, 100 * FUSD);
     }
 
-    function test_s2_3_reEnteringWithTheSameSignedPaymentFindsItsNonceUsed() public {
+    function test_s2_3_reEnteringPayIsRefusedByTheGuard() public {
         ReentrantToken t = new ReentrantToken();
         uint256 potId = _reentrantPot(t);
         uint256 nonce = crumena.nonceOf(recipient);
@@ -292,7 +300,8 @@ contract AuditTest is Base {
 
         crumena.pay(potId, supplierA, 10 * FUSD, "", recipient, a);
         assertTrue(t.tried());
-        assertEq(t.outcome(), abi.encodeWithSelector(Crumena.BadNonce.selector, nonce + 1, nonce), "the nonce moved before the transfer");
+        assertEq(t.outcome(), abi.encodeWithSelector(Crumena.Reentrant.selector), "the guard refused the re-entry");
+        assertEq(crumena.nonceOf(recipient), nonce + 1, "the signature was used once");
         assertEq(t.balanceOf(supplierA), 10 * FUSD, "paid once");
         assertEq(crumena.potInfo(potId).paidOut, 10 * FUSD);
     }
@@ -304,6 +313,7 @@ contract AuditTest is Base {
         vm.warp(crumena.potInfo(potId).endsAt + 1);
         crumena.reclaim(potId);
         assertTrue(t.tried());
+        assertEq(t.outcome(), abi.encodeWithSelector(Crumena.Reentrant.selector), "the guard refused the re-entry");
         assertEq(t.balanceOf(funder), 100 * FUSD, "everything went to the funder, once");
         assertEq(t.balanceOf(crumena.potInfo(potId).vault), 0);
         assertTrue(crumena.potInfo(potId).closed);
@@ -336,5 +346,73 @@ contract AuditTest is Base {
         uint256 used = gasBefore - gasleft();
         emit log_named_uint("createPot with ten payees, gas", used);
         assertLt(used, 3_000_000, "fits the relayer's per-call gas cap");
+    }
+
+    // ---------------------------------------------------------- v3 audit
+    // Findings from QCAI's v3 report and Crumena's own review before the v4 deploy.
+
+    /// @notice V3-3: with the guard off the path (no re-entry), state is still updated
+    ///         before the transfer: the token sees paidOut and the nonce already moved.
+    function test_v3_3_stateIsUpdatedBeforeTheTransfer() public {
+        ReentrantToken t = new ReentrantToken();
+        uint256 potId = _reentrantPot(t);
+        uint256 nonce = crumena.nonceOf(recipient);
+        string memory st = crumena.payStatement(potId, supplierA, 10 * FUSD, "", recipient, nonce, _validUntil());
+        Crumena.Auth memory a = Crumena.Auth(nonce, _validUntil(), _sig(recipient, st));
+        t.arm(address(crumena), abi.encodeWithSignature("nonceOf(address)", recipient));
+        crumena.pay(potId, supplierA, 10 * FUSD, "", recipient, a);
+        assertTrue(t.tried());
+        assertEq(abi.decode(t.outcome(), (uint256)), nonce + 1, "nonce moved before the transfer");
+    }
+
+    /// @notice V3-4: the payee list is read in pages of at most MAX_PAYEES.
+    function test_v3_4_payeesAreReadInBoundedPages() public {
+        uint256 potId = _fundedPot(10 * FUSD);
+        for (uint160 i = 1; i <= 4; ++i) {
+            _addPayee(potId, address(0xB000 + i), "Shop");
+        }
+        uint256 n = crumena.payeeCount(potId);
+        (address[] memory all,) = crumena.payeesOf(potId, 0, 50);
+        assertEq(all.length, n);
+        (address[] memory page,) = crumena.payeesOf(potId, 1, 2);
+        assertEq(page.length, 2);
+        assertEq(page[0], all[1]);
+        assertEq(page[1], all[2]);
+        (address[] memory tail,) = crumena.payeesOf(potId, n - 1, 50);
+        assertEq(tail.length, 1);
+        (address[] memory none,) = crumena.payeesOf(potId, n + 5, 50);
+        assertEq(none.length, 0);
+        (address[] memory capped,) = crumena.payeesOf(potId, 0, type(uint256).max);
+        assertEq(capped.length, n);
+    }
+
+    /// @notice Own review: the spender's requests can't fill the list. The last
+    ///         FUNDER_ONLY_SLOTS places stay for payees the funder approves.
+    function test_review_requestsCantCrowdOutTheFunder() public {
+        uint256 potId = _fundedPot(10 * FUSD);
+        uint256 room = crumena.MAX_PAYEES() - crumena.FUNDER_ONLY_SLOTS() - crumena.payeeCount(potId);
+        for (uint160 i = 1; i <= room; ++i) {
+            _request(potId, address(0xC000 + i));
+        }
+        uint256 nonce = crumena.nonceOf(recipient);
+        address extra = address(0xCFFF);
+        string memory st = crumena.requestPayeeStatement(potId, extra, "Shop", 1, nonce, _validUntil());
+        Crumena.Auth memory a = Crumena.Auth(nonce, _validUntil(), _sig(recipient, st));
+        vm.expectRevert(Crumena.TooManyPayees.selector);
+        crumena.requestPayee(potId, extra, "Shop", 1, a);
+        // The funder can still approve up to the full list.
+        for (uint160 i = 1; i <= crumena.FUNDER_ONLY_SLOTS(); ++i) {
+            _addPayee(potId, address(0xD000 + i), "Shop");
+        }
+        assertEq(crumena.payeeCount(potId), crumena.MAX_PAYEES());
+        // And approve one the spender asked for, already on the list.
+        _addPayee(potId, address(0xC001), "Shop");
+    }
+
+    function _request(uint256 potId, address payee) internal {
+        uint256 nonce = crumena.nonceOf(recipient);
+        string memory st = crumena.requestPayeeStatement(potId, payee, "Shop", 1, nonce, _validUntil());
+        Crumena.Auth memory a = Crumena.Auth(nonce, _validUntil(), _sig(recipient, st));
+        crumena.requestPayee(potId, payee, "Shop", 1, a);
     }
 }

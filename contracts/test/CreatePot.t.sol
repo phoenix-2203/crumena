@@ -26,7 +26,7 @@ contract CreatePotTest is Base {
         assertEq(crumena.potOfVault(predicted), potId);
         assertEq(PotVault(predicted).crumena(), address(crumena));
 
-        (address[] memory addrs, Crumena.Payee[] memory info) = crumena.payeesOf(potId);
+        (address[] memory addrs, Crumena.Payee[] memory info) = crumena.payeesOf(potId, 0, 50);
         assertEq(addrs.length, 2);
         assertEq(addrs[0], supplierA);
         assertEq(info[0].name, "Halden Building Supplies");
@@ -45,7 +45,7 @@ contract CreatePotTest is Base {
         token.mint(vault, 100 * FUSD); // paid in before the pot exists
         uint256 potId = _createSigned(_newPot());
         token.mint(vault, 50 * FUSD); // topped up by anyone afterwards
-        assertEq(crumena.balanceOf(potId), 150 * FUSD);
+        assertEq(crumena.potBalance(potId), 150 * FUSD);
     }
 
     function test_emitsPotCreatedAndPayeeApproved() public {

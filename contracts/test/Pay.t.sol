@@ -16,7 +16,7 @@ contract PayTest is Base {
     function test_recipientPaysAnApprovedPayee() public {
         _pay(potId, recipient, supplierA, 250 * FUSD, "PO-1042 materials");
         assertEq(token.balanceOf(supplierA), 250 * FUSD);
-        assertEq(crumena.balanceOf(potId), 750 * FUSD);
+        assertEq(crumena.potBalance(potId), 750 * FUSD);
         assertEq(crumena.potInfo(potId).paidOut, 250 * FUSD);
         assertEq(crumena.nonceOf(recipient), 1);
     }
@@ -34,7 +34,7 @@ contract PayTest is Base {
 
     function test_canPayEverythingInThePot() public {
         _pay(potId, recipient, supplierA, 1000 * FUSD, "all of it");
-        assertEq(crumena.balanceOf(potId), 0);
+        assertEq(crumena.potBalance(potId), 0);
     }
 
     function test_paymentsGoStraightFromTheVaultToThePayee() public {
@@ -177,7 +177,7 @@ contract PayTest is Base {
         uint256 y = bound(b, 1, total - x);
         _pay(potId, recipient, supplierA, x, "");
         _pay(potId, funder, supplierB, y, "");
-        assertEq(token.balanceOf(supplierA) + token.balanceOf(supplierB) + crumena.balanceOf(potId), total);
+        assertEq(token.balanceOf(supplierA) + token.balanceOf(supplierB) + crumena.potBalance(potId), total);
         assertEq(crumena.potInfo(potId).paidOut, x + y);
     }
 

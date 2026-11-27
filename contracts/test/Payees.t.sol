@@ -86,7 +86,7 @@ contract PayeesTest is Base {
             _auth(funder, crumena.removePayeeStatement(potId, supplierB, crumena.nonceOf(funder), _validUntil()));
         crumena.removePayee(potId, supplierB, a);
         _addPayee(potId, supplierB, "Brightline Electrical");
-        (address[] memory addrs,) = crumena.payeesOf(potId);
+        (address[] memory addrs,) = crumena.payeesOf(potId, 0, 50);
         assertEq(addrs.length, 2);
     }
 
@@ -120,7 +120,7 @@ contract PayeesTest is Base {
         p = crumena.payeeInfo(potId, newShop);
         assertTrue(p.approved);
         assertFalse(p.requested);
-        (address[] memory addrs,) = crumena.payeesOf(potId);
+        (address[] memory addrs,) = crumena.payeesOf(potId, 0, 50);
         assertEq(addrs.length, 3, "listed once");
     }
 

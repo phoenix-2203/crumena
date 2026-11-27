@@ -75,7 +75,7 @@ contract LifecycleTest is Base {
         vm.prank(stranger); // anyone can trigger it: the money can only go to the funder
         crumena.reclaim(potId);
         assertEq(token.balanceOf(funder), 180 * FUSD);
-        assertEq(crumena.balanceOf(potId), 0);
+        assertEq(crumena.potBalance(potId), 0);
         assertTrue(crumena.potInfo(potId).closed);
     }
 

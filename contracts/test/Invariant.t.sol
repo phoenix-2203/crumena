@@ -54,7 +54,7 @@ contract PotHandler is Test {
     function pay(uint256 shopIndex, uint256 amount, bool byFunder) external {
         Crumena.Pot memory pot = crumena.potInfo(potId);
         if (pot.closed || block.timestamp > pot.endsAt) return;
-        uint256 bal = crumena.balanceOf(potId);
+        uint256 bal = crumena.potBalance(potId);
         if (bal == 0) return;
         address shop = shops[shopIndex % shops.length];
         if (!crumena.payeeInfo(potId, shop).approved) return;
@@ -104,7 +104,7 @@ contract PotHandler is Test {
     function reclaim() external {
         Crumena.Pot memory pot = crumena.potInfo(potId);
         if (!pot.closed && block.timestamp <= pot.endsAt) return;
-        uint256 bal = crumena.balanceOf(potId);
+        uint256 bal = crumena.potBalance(potId);
         if (bal == 0) return;
         crumena.reclaim(potId);
         returned += bal;
@@ -155,7 +155,7 @@ contract InvariantTest is Base {
     /// with the funder or recipient: nothing is created, lost or diverted.
     function invariant_moneyIsAccountedFor() public view {
         assertEq(
-            handler.funded(), crumena.balanceOf(potId) + handler.paidToShops() + handler.returned()
+            handler.funded(), crumena.potBalance(potId) + handler.paidToShops() + handler.returned()
         );
         uint256 atShops;
         for (uint256 i; i < handler.shopCount(); ++i) atShops += token.balanceOf(handler.shopAt(i));

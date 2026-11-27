@@ -7,7 +7,7 @@ The Post-Quantum dApp track asks for a two-stage audit with QoreChain's AI audit
 | Stage 1 | 2026-11-26 | [`audit/stage1-2026-11-26.pdf`](audit/stage1-2026-11-26.pdf) | 82/100 (risk: medium) | 1 high, 2 medium, 1 low, 1 info |
 | Stage 2 | 2026-11-26 | [`audit/stage2-2026-11-26.pdf`](audit/stage2-2026-11-26.pdf) | 82/100 (risk: medium) | 1 high, 2 medium, 1 low, 1 info |
 
-**Audited code.** One file, [`audit/Crumena.audit.sol`](audit/Crumena.audit.sol): the contract's four sources (`lib/Text.sol`, `lib/Pqc.sol`, `PotVault.sol`, `Crumena.sol`) joined without changes, only their import, pragma and licence lines dropped. It is the code deployed at `0xD98320A95030874498b92e9cf66f95F83dDe47af` ([`TESTNET_RUN.md`](TESTNET_RUN.md)). QCAI's line numbers don't point at the lines it describes in that file (line 658 is inside `addPayeeStatement`, for example), so findings are matched to the code by what they describe.
+**Audited code.** One file, [`audit/Crumena-v2.audit.sol`](audit/Crumena-v2.audit.sol): the contract's four sources (`lib/Text.sol`, `lib/Pqc.sol`, `PotVault.sol`, `Crumena.sol`) joined without changes, only their import, pragma and licence lines dropped. It is the previous build, deployed at `0xD98320A95030874498b92e9cf66f95F83dDe47af`. The current build (`0x08E9234d443CeF03ecf118dCa2D4f1002Abc9128`, [`TESTNET_RUN.md`](TESTNET_RUN.md)) adds per-payee amounts and short links; its joined file is [`audit/Crumena.audit.sol`](audit/Crumena.audit.sol), and the QCAI audit is to be run on it again. QCAI's line numbers don't point at the lines it describes in that file (line 658 is inside `addPayeeStatement`, for example), so findings are matched to the code by what they describe.
 
 ## Stage 1 findings and what we did
 

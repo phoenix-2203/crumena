@@ -95,23 +95,26 @@ Full threat model: [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md).
 
 ## Proven on testnet
 
-Contract `0xD98320A95030874498b92e9cf66f95F83dDe47af` on `qorechain-diana`, deployed from commit `da53d0a`; [`server/scripts/match-bytecode.ts`](server/scripts/match-bytecode.ts) shows the code on chain is exactly this source (QoreChain's explorer has no source verification yet). The live run, **21 of 21**:
+Contract `0x08E9234d443CeF03ecf118dCa2D4f1002Abc9128` on `qorechain-diana`, deployed from commit `7b11386`; [`server/scripts/match-bytecode.ts`](server/scripts/match-bytecode.ts) shows the code on chain is exactly this source (QoreChain's explorer has no source verification yet). The live run, **23 of 23**:
 
 | | Check | Result |
 |---|---|---|
-| ✓ | Funder creates a pot (cap 30 fUSD, 60 fUSD a week), signed with ML-DSA-87, checked by `pqcVerify` | [tx](https://explore.qore.network/tx/5AE33D0B8DF540B5F8E865E77B4788697B0B14C3D7EA1552C891838DE4BFD58D) |
-| ✓ | Funder pays 100 fUSD into the pot's address from the bank lane (`MsgConvertCoin`, hybrid-signed) | [tx](https://explore.qore.network/tx/47137D7E03B2CB46B45A5B6E464232DA32892A4DA40CC855BE6A7F9B2F10B35F) |
-| ✓ | The spender pays an approved vendor 25 fUSD; no gas, no transaction of their own | [tx](https://explore.qore.network/tx/91C835422C9A539C72F7D827F86EC32D567198ABFCA87A9C8E9116646AACCE31) |
+| ✓ | Funder creates a pot (cap 30 fUSD, 60 fUSD a week, one vendor approved up to 60 fUSD), signed with ML-DSA-87, checked by `pqcVerify` | [tx](https://explore.qore.network/tx/FC2C1E225253478439B9192F46BE29A9A913F0EB38177D23CB6FBE551E8D4702) |
+| ✓ | The pot's short link code (first 8 bytes of its vault) finds it on chain | `potOfCode` |
+| ✓ | Funder pays 100 fUSD into the pot's address from the bank lane (`MsgConvertCoin`, hybrid-signed) | [tx](https://explore.qore.network/tx/AB26474F76C50863CC6A326078D415A8FC09437842EE581E89F25E1D374B1432) |
+| ✓ | The spender pays an approved vendor 25 fUSD; no gas, no transaction of their own | [tx](https://explore.qore.network/tx/3F72B7870F6325C5EE72B13DE9FBAA279A1A47AD828813524433363813B748B1) |
 | ✓ | The same payment checked off chain: statement and key from the chain, ML-DSA-87 verified; the signature over a changed amount fails | |
-| ✓ | The vendor confirms its address with its own key; a new vendor is requested, approved and paid | [tx](https://explore.qore.network/tx/148CB9609005DB44ED0F273408BFF059D1524F7FF71A94D7558288A88E037A2A) · [tx](https://explore.qore.network/tx/59BC9C036860C36E13D68757A75189D2FDC9C6FBE912D02B53B7060EA84DE67D) · [tx](https://explore.qore.network/tx/61B90D4B5127A37691A3577FC0AD5EC3EFBC943D2CDFB6BCCDA5979B9A72E0BE) |
+| ✓ | The vendor confirms its address with its own key | [tx](https://explore.qore.network/tx/1144E465C47FCEB4048D72756FA8041F1E9F5D9CC6C6C8352528B7285EA80A95) |
+| ✓ | The spender asks for a new vendor for 15 fUSD; the funder approves it up to 12 fUSD; it's paid 10 | [tx](https://explore.qore.network/tx/2ED71735F5825AEA4629F417D8B2E1055F48A3339CEE4C9752ABB2F9D0DB879A) · [tx](https://explore.qore.network/tx/0637AC0729E0DD23D961BE35E0471BF2A4C92AE234CD6FBB17E63984080D05DA) · [tx](https://explore.qore.network/tx/A49A3B31CB3F6AC80A86DBA647656E2B3C5B842E70D946F54F864CBEB57BEE8A) |
+| ✓ | Paying that vendor 5 more, past the 12 approved, is refused | `OverPayeeLimit` |
 | ✓ | A stolen classical key can't open an EVM window: the chain requires the hybrid signature | refused by the chain |
-| ✓ | `addPayee` from the funder's own address without its post-quantum signature | [reverted on chain](https://explore.qore.network/tx/37C1E57DB0F981D06B6A693056673ABCD16F615197447CA0BAB06C66EB9D5D07) |
+| ✓ | `addPayee` from the funder's own address without its post-quantum signature | [reverted on chain](https://explore.qore.network/tx/7D1635AD0CE5FBC8DD80A7B1405767A33773BFA51EDC37548DA3FA2DF27FF63E) |
 | ✓ | The attacker's own registered key; a replay; an unapproved payee; an amount raised after signing | `BadPqcSignature`, `BadNonce`, `NotApproved`, `BadPqcSignature` |
 | ✓ | Over the per-payment cap; past the weekly limit (55 of 60 spent) | `OverPaymentLimit`, `OverPeriodLimit` |
-| ✓ | The funder freezes the pot; a signed payment from it is refused | [tx](https://explore.qore.network/tx/5C108471FC781D0EAE7F8D9583E8F19624F0E7F60C8258F8D547A97BF513D648), `PotFrozen` |
-| ✓ | After the end date, the rest goes back to the funder | [tx](https://explore.qore.network/tx/5A9A277BAD95A94BDEBC0A95BBFA0521939D7E21046F10D9E4EB1643A8B3CE45) |
+| ✓ | The funder freezes the pot; a signed payment from it is refused | [tx](https://explore.qore.network/tx/5B8E3D8BCACC8468D045CF81A1CB7D6C712B038180B2C52AE001E6AC76C75044), `PotFrozen` |
+| ✓ | After the end date, the rest goes back to the funder | [tx](https://explore.qore.network/tx/83B70D7DDE67BA68287C83250B71293AE81EC3B3CF584FAF0ABE59DB4AEE1D7E) |
 
-Explorer links: switch QoreChain's explorer to **Testnet** at the top of the page. All 21 steps, accounts and hashes: [`docs/TESTNET_RUN.md`](docs/TESTNET_RUN.md).
+Explorer links: switch QoreChain's explorer to **Testnet** at the top of the page. All 23 steps, accounts and hashes: [`docs/TESTNET_RUN.md`](docs/TESTNET_RUN.md).
 
 ## Repository
 

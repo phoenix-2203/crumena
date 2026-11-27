@@ -81,24 +81,44 @@ A pot's token is chosen by its funder; a token that misbehaves can only affect i
 
 Every token call is defensive. `decimals()` and `symbol()` are read once, by `staticcall`, with their answers' shapes checked (`BadToken` otherwise, and symbols must be short plain text so statements stay readable); `balanceOf` is a checked `staticcall`; `transfer` accepts the standard `true` and older tokens that return nothing, and reverts on anything else; an address without code can't be a pot's token.
 
-## v3: the current build
+## v3, and the v4 changes
 
-Same setting, on [`audit/Crumena.audit.sol`](audit/Crumena.audit.sol) (v3: per-payee amounts, short links). **72/100**, five findings. Four are the earlier findings again, located elsewhere. One pointed at a real, small defect, now fixed.
+Same setting, on the v3 contract (per-payee amounts, short links). **72/100**, five findings. Four are the earlier findings again, located elsewhere. One pointed at a real, small defect.
 
-| # | v3 finding | Severity | Same as | Resolution | Regression tests |
+Earlier stages answered findings like these with explanations and tests and left the code as it was. For v4 the code changes too: where a finding is a pattern an AI reviewer looks for, v4 now has that pattern explicitly (a named access modifier, a reentrancy guard, a paged list), so the protection is visible in the code and not only in this file. The joined v4 file, [`audit/Crumena.audit.sol`](audit/Crumena.audit.sol), is what QCAI reviews next.
+
+| # | v3 finding | Severity | Same as | v4 | Regression tests |
 |---|---|---|---|---|---|
-| V3-1 | Missing access control on `PotVault.send()` | HIGH | S2-1 | **Already in place**, as in [S2-1](#s2-1): `NotCrumena` unless the caller is the vault's creator. | `test_s2_1_anotherCrumenaCantMoveThisCrumenasVault`, `test_qcai3_onlyCrumenaMovesAVaultsMoney` |
-| V3-2 | Potential overflow in period calculation | HIGH | QCAI-2, S2-2 | **Fixed: one subtraction could underflow, with no effect on money.** See [V3-2](#v3-2). | `test_aPeriodLimitLoweredBelowWhatWasSpentRefusesCleanly`, the three `qcai2` tests |
-| V3-3 | Reentrancy risk in `PotVault.send()` | MEDIUM | S2-3 | **Not exploitable**, as in [S2-3](#s2-3): every state change happens before the transfer. | the two `s2_3` tests |
-| V3-4 | Unbounded loop in `payeesOf()` | MEDIUM | QCAI-4 | **Bounded**, as in [QCAI-4](#qcai-4): at most 50 payees, and `payeesOf` is a view no transaction calls. | `test_qcai4_thePayeeListIsCappedAndNeverGrowsTwiceForOneAddress` |
-| V3-5 | Missing ERC-20 interface compliance | LOW | S2-5 | **Not applicable.** See [V3-5](#v3-5). | the `qcai3` tests, `test_rejectsATokenThatIsNotAContract` |
+| V3-1 | Missing access control on `PotVault.send()` | HIGH | S2-1 | The check was already there ([S2-1](#s2-1)). v4 makes it a named `onlyCrumena` modifier. | `test_s2_1_anotherCrumenaCantMoveThisCrumenasVault`, `test_qcai3_onlyCrumenaMovesAVaultsMoney` |
+| V3-2 | Potential overflow in period calculation | HIGH | QCAI-2, S2-2 | **Fixed: one subtraction could underflow, with no effect on money.** See [V3-2](#v3-2). v4 also checks that the period index fits `uint64` before narrowing it. | `test_aPeriodLimitLoweredBelowWhatWasSpentRefusesCleanly`, the three `qcai2` tests |
+| V3-3 | Reentrancy risk in `PotVault.send()` | MEDIUM | S2-3 | Not exploitable: state is updated before every transfer ([S2-3](#s2-3)). v4 also adds a `nonReentrant` guard to `pay`, `release` and `reclaim`. | `test_s2_3_reEnteringPayIsRefusedByTheGuard`, `test_s2_3_reEnteringReclaimOnlyEverPaysTheFunder`, `test_v3_3_stateIsUpdatedBeforeTheTransfer` |
+| V3-4 | Unbounded loop in `payeesOf()` | MEDIUM | QCAI-4 | Was bounded by 50 ([QCAI-4](#qcai-4)). v4 reads the list in pages (`payeesOf(potId, start, count)`, at most 50 a page) and adds `payeeCount`. | `test_v3_4_payeesAreReadInBoundedPages`, `test_qcai4_thePayeeListIsCappedAndNeverGrowsTwiceForOneAddress` |
+| V3-5 | Missing ERC-20 interface compliance | LOW | S2-5 | Not applicable: see [V3-5](#v3-5). v4 renames `balanceOf(potId)` to `potBalance(potId)`. | the `qcai3` tests, `test_rejectsATokenThatIsNotAContract` |
 
 ### V3-2
 
 Line 420 of the joined file is the limit check in `pay`. Nothing there can wrap silently (Solidity 0.8 checks all arithmetic), but one case reverted with an arithmetic panic instead of the contract's own error: a funder keeps the period length and lowers the period limit below what was already spent this period (say 50 of 60 spent, limit lowered to 40). The next payment was refused, as it should be, but while building the "how much is left" number for `OverPeriodLimit`, `periodLimit - spent` underflowed, so the app could only say "the transaction was refused". No money could move. The fix gives `OverPeriodLimit(0)`, the same guard the per-payee check already had. The new test lowers the limit below what was spent, expects `OverPeriodLimit(0)`, then checks that payments work again from the next period.
 
-The fix is in the source (commit `66fbd37`). The contract deployed at `0x08E9234d443CeF03ecf118dCa2D4f1002Abc9128` was built before it and still has the old line until the next deploy.
-
 ### V3-5
 
-Crumena isn't a token and doesn't claim to be one. Its `balanceOf(potId)` is the money in one pot, read from the pot's token with a checked `staticcall`; the name matches ERC-20 but it takes a pot number, not an address. Calls to the pot's token are as described in [S2-5](#s2-5).
+Crumena isn't a token and doesn't claim to be one. What QCAI saw was `balanceOf(potId)`: the money in one pot, read from the pot's token with a checked `staticcall`. It had the ERC-20 name but took a pot number, not an address. v4 calls it `potBalance`. Calls to the pot's token are as described in [S2-5](#s2-5).
+
+## Our own review before v4
+
+Before the next QCAI run we went through every function of `Crumena.sol`, `PotVault.sol`, `lib/Pqc.sol` and `lib/Text.sol` ourselves, looking for anything QCAI hadn't named. One more issue, now fixed:
+
+| # | Finding | Severity | v4 | Regression test |
+|---|---|---|---|---|
+| R-1 | **The spender could fill the payee list with requests.** `requestPayee` adds the address to the pot's list, which holds at most 50. A spender could request 50 addresses and leave the funder unable to approve any payee (`TooManyPayees`). No money at risk: the funder could still freeze, release or wait for the end date. | LOW | Requests can fill the list only up to 40; the last `FUNDER_ONLY_SLOTS` (10) are kept for payees the funder approves, and an address already requested can still be approved. | `test_review_requestsCantCrowdOutTheFunder` |
+
+Checked and found sound, with the existing tests that cover each:
+- **Who signs what**: each action names its signer (funder; spender or funder for payments; the payee for confirmation), and the statement names the signer, the nonce, the deadline, the contract and the chain.
+- **Statement text**: names, purposes, memos and token symbols must be printable ASCII, so no one can add a line to a statement or hide text behind look-alike letters.
+- **Addresses a pot can't pay**: zero, the funder, the spender, its own vault, any other pot's vault, the contract itself.
+- **Vaults**: one per pot at a CREATE2 address from the funder and their nonce, so no two pots share one, and only this contract can move a vault's money.
+- **Tokens**: a pot's token must be a contract, and its decimals (at most 18), symbol and balances are read by checked calls. A token that misbehaves affects only pots that chose it.
+- **Pqc**: fails closed on any precompile answer of the wrong shape, requires ML-DSA-87, a proof of possession and the exact key and signature lengths.
+
+Not addressed, by design: tokens that take a fee on transfer or change balances on their own aren't supported (pots are for stable tokens such as fUSD), and tokens sent to a vault other than its pot's token stay there.
+
+The fixes are in the source and not deployed yet. The contract live at `0x08E9234d443CeF03ecf118dCa2D4f1002Abc9128` is v3, built before them; v4 is deployed next, and [`TESTNET_RUN.md`](TESTNET_RUN.md) is updated with it.

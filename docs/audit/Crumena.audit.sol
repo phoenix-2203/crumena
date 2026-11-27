@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// Crumena v3 (per-payee limits, request amounts, link codes), for the QCAI audit: the four source files
+// Crumena v4 (v3 plus the QCAI v3 fixes: a reentrancy guard, an onlyCrumena modifier, a paged payee list,
+// potBalance, a checked period index, slots kept for the funder), for the QCAI audit: the four source files
 // below joined into one, unchanged except that their import, pragma and licence lines are dropped.
 // Sources: contracts/src/lib/Text.sol, contracts/src/lib/Pqc.sol, contracts/src/PotVault.sol, contracts/src/Crumena.sol
 
@@ -258,16 +259,21 @@ contract PotVault {
         crumena = msg.sender;
     }
 
-    /// @notice Sends `amount` of `token` to `to`. Only Crumena can call it.
-    function send(address token, address to, uint256 amount) external {
+    /// @dev Access control: only the Crumena contract that deployed this vault.
+    modifier onlyCrumena() {
         if (msg.sender != crumena) revert NotCrumena();
+        _;
+    }
+
+    /// @notice Sends `amount` of `token` to `to`. Only Crumena can call it, after the
+    ///         pot's checks and with its own state already updated.
+    function send(address token, address to, uint256 amount) external onlyCrumena {
         (bool ok, bytes memory ret) = token.call(abi.encodeWithSelector(0xa9059cbb, to, amount)); // transfer(address,uint256)
         if (!ok || (ret.length != 0 && (ret.length != 32 || !abi.decode(ret, (bool))))) revert TransferFailed();
     }
 }
 
 // ===================================================================== contracts/src/Crumena.sol
-
 
 /// @title Crumena
 /// @notice Money with a purpose. A funder puts money in a pot for someone (the
@@ -288,6 +294,21 @@ contract PotVault {
 ///
 ///         Each pot's money sits in its own vault, an address anyone can pay into.
 ///         There is no owner, no admin key, no fee and no upgrade.
+/// @custom:security
+///         - Access control: every action names who must sign it (_authorize); a vault
+///           pays out only when this contract calls it (PotVault.onlyCrumena).
+///         - Replay: per-signer sequential nonces, a deadline of at most 7 days, and the
+///           contract address and chain inside every signed statement.
+///         - Reentrancy: pay, release and reclaim update state before the token transfer
+///           (checks-effects-interactions) and are also nonReentrant.
+///         - Arithmetic: Solidity 0.8 checked math; every subtraction is guarded; the
+///           period index is checked to fit uint64.
+///         - Loops: a pot's payee list holds at most MAX_PAYEES (50), read in pages;
+///           creation checks at most 10 payees.
+///         - Tokens: a pot's token must be a contract; decimals, symbol and balance are
+///           read by checked staticcall; transfer must return true or nothing.
+///         - Time: block.timestamp only decides end dates and periods of days, where
+///           seconds of drift don't matter.
 contract Crumena {
     // ------------------------------------------------------------------ types
 
@@ -355,6 +376,9 @@ contract Crumena {
 
     uint256 public constant MAX_PAYEES_AT_CREATION = 10;
     uint256 public constant MAX_PAYEES = 50;
+    /// @notice Slots in a pot's payee list that the spender's requests can't fill, so the
+    ///         funder can always approve payees.
+    uint256 public constant FUNDER_ONLY_SLOTS = 10;
     uint256 public constant MAX_PURPOSE = 80;
     uint256 public constant MAX_NAME = 48;
     uint256 public constant MAX_MEMO = 80;
@@ -369,6 +393,7 @@ contract Crumena {
     // ------------------------------------------------------------------ state
 
     uint256 public potCount;
+    uint256 private _locked = 1; // reentrancy guard: 2 while money is moving
     mapping(uint256 => Pot) private _pots;
     mapping(uint256 => mapping(address => Payee)) private _payees;
     mapping(uint256 => address[]) private _payeeList; // every address ever approved or requested, in order
@@ -434,11 +459,21 @@ contract Crumena {
     error OverPeriodLimit(uint256 remaining);
     error NoChange();
     error OverPayeeLimit(uint256 remaining);
+    error Reentrant();
 
     constructor(string memory chainName_, uint256 evmChainId_) {
         if (block.chainid != evmChainId_) revert WrongChain();
         chainName = chainName_;
         evmChainId = evmChainId_;
+    }
+
+    /// @dev Defence in depth on the three functions that move money. Each already updates
+    ///      its state before the transfer (checks-effects-interactions).
+    modifier nonReentrant() {
+        if (_locked != 1) revert Reentrant();
+        _locked = 2;
+        _;
+        _locked = 1;
     }
 
     // ================================================================ actions
@@ -476,12 +511,15 @@ contract Crumena {
         if (p.rules.maxPerPayment != 0 || p.rules.periodDays != 0) {
             emit RulesChanged(potId, p.rules.maxPerPayment, p.rules.periodLimit, p.rules.periodDays);
         }
-        for (uint256 i; i < p.payees.length; ++i) _approve(potId, p.payees[i], p.names[i], p.limits[i]);
+        for (uint256 i; i < p.payees.length; ++i) {
+            _approve(potId, p.payees[i], p.names[i], p.limits[i]);
+        }
     }
 
     /// @notice Pay an approved payee from the pot. Signed by the recipient or the funder.
     function pay(uint256 potId, address payee, uint256 amount, string calldata memo, address signer, Auth calldata a)
         external
+        nonReentrant
     {
         Pot storage pot = _openPot(potId);
         if (block.timestamp > pot.endsAt) revert PotEnded();
@@ -494,9 +532,11 @@ contract Crumena {
         if (pot.maxPerPayment != 0 && amount > pot.maxPerPayment) revert OverPaymentLimit(pot.maxPerPayment);
         if (p.limit != 0 && p.paid + amount > p.limit) revert OverPayeeLimit(p.limit > p.paid ? p.limit - p.paid : 0);
         (uint64 period, uint256 spent) = _periodSpent(pot);
-        if (pot.periodDays != 0 && spent + amount > pot.periodLimit) revert OverPeriodLimit(pot.periodLimit > spent ? pot.periodLimit - spent : 0);
+        if (pot.periodDays != 0 && spent + amount > pot.periodLimit) {
+            revert OverPeriodLimit(pot.periodLimit > spent ? pot.periodLimit - spent : 0);
+        }
         Text.requirePrintableOrEmpty(memo, MAX_MEMO);
-        uint256 available = balanceOf(potId);
+        uint256 available = potBalance(potId);
         if (amount > available) revert NotEnoughInPot(available, amount);
         _authorize(signer, payStatement(potId, payee, amount, memo, signer, a.nonce, a.validUntil), a);
 
@@ -553,6 +593,9 @@ contract Crumena {
         if (amount == 0) revert ZeroAmount();
         Payee storage p = _payees[potId][payee];
         if (p.approved) revert AlreadyApproved();
+        if (!_listed[potId][payee] && _payeeList[potId].length >= MAX_PAYEES - FUNDER_ONLY_SLOTS) {
+            revert TooManyPayees();
+        }
         _authorize(pot.recipient, requestPayeeStatement(potId, payee, name, amount, a.nonce, a.validUntil), a);
         _list(potId, payee);
         p.requested = true;
@@ -609,10 +652,10 @@ contract Crumena {
 
     /// @notice Give everything left to the recipient, with no more restrictions, and
     ///         close the pot. Signed by the funder.
-    function release(uint256 potId, Auth calldata a) external {
+    function release(uint256 potId, Auth calldata a) external nonReentrant {
         Pot storage pot = _openPot(potId);
         _authorize(pot.funder, releaseStatement(potId, a.nonce, a.validUntil), a);
-        uint256 amount = balanceOf(potId);
+        uint256 amount = potBalance(potId);
         pot.closed = true;
         emit Released(potId, pot.recipient, amount);
         if (amount != 0) PotVault(pot.vault).send(pot.token, pot.recipient, amount);
@@ -621,11 +664,11 @@ contract Crumena {
     /// @notice After the end date, send what is left back to the funder and close the pot.
     ///         Anyone can call it: the money can only go to the funder. It also returns
     ///         anything paid into a closed pot's vault later.
-    function reclaim(uint256 potId) external {
+    function reclaim(uint256 potId) external nonReentrant {
         Pot storage pot = _pots[potId];
         if (pot.vault == address(0)) revert NoSuchPot();
         if (!pot.closed && block.timestamp <= pot.endsAt) revert PotNotEnded();
-        uint256 amount = balanceOf(potId);
+        uint256 amount = potBalance(potId);
         if (amount == 0) revert NothingToMove();
         pot.closed = true;
         emit Reclaimed(potId, pot.funder, amount);
@@ -665,10 +708,14 @@ contract Crumena {
                 p.names[i],
                 ", ",
                 Text.hexAddress(p.payees[i]),
-                p.limits[i] == 0 ? ", no limit" : string.concat(", up to ", Text.units(p.limits[i], decimals), " ", symbol)
+                p.limits[i] == 0
+                    ? ", no limit"
+                    : string.concat(", up to ", Text.units(p.limits[i], decimals), " ", symbol)
             );
         }
-        return string.concat(s, "\nPot address: ", Text.hexAddress(vaultFor(p.funder, nonce)), _footer(p.funder, nonce, validUntil));
+        return string.concat(
+            s, "\nPot address: ", Text.hexAddress(vaultFor(p.funder, nonce)), _footer(p.funder, nonce, validUntil)
+        );
     }
 
     function payStatement(
@@ -882,7 +929,7 @@ contract Crumena {
     }
 
     /// @notice Money in the pot now.
-    function balanceOf(uint256 potId) public view returns (uint256) {
+    function potBalance(uint256 potId) public view returns (uint256) {
         Pot storage pot_ = _existing(potId);
         (bool ok, bytes memory ret) = pot_.token.staticcall(abi.encodeWithSelector(0x70a08231, pot_.vault)); // balanceOf(address)
         if (!ok || ret.length != 32) revert BadToken();
@@ -900,11 +947,31 @@ contract Crumena {
     }
 
     /// @notice Every payee ever approved or requested for a pot, with its state.
-    function payeesOf(uint256 potId) external view returns (address[] memory addrs, Payee[] memory info) {
+    /// @notice How many addresses a pot's payee list holds (at most MAX_PAYEES).
+    function payeeCount(uint256 potId) external view returns (uint256) {
         _existing(potId);
-        addrs = _payeeList[potId];
-        info = new Payee[](addrs.length);
-        for (uint256 i; i < addrs.length; ++i) info[i] = _payees[potId][addrs[i]];
+        return _payeeList[potId].length;
+    }
+
+    /// @notice Part of a pot's payee list: up to `count` entries from `start`. The list
+    ///         never holds more than MAX_PAYEES, so one page of 50 is all of it.
+    function payeesOf(uint256 potId, uint256 start, uint256 count)
+        external
+        view
+        returns (address[] memory addrs, Payee[] memory info)
+    {
+        _existing(potId);
+        address[] storage list = _payeeList[potId];
+        uint256 end = list.length;
+        if (count > MAX_PAYEES) count = MAX_PAYEES;
+        if (start > end) start = end;
+        if (end - start > count) end = start + count;
+        addrs = new address[](end - start);
+        info = new Payee[](end - start);
+        for (uint256 i = start; i < end; ++i) {
+            addrs[i - start] = list[i];
+            info[i - start] = _payees[potId][list[i]];
+        }
     }
 
     function payeeInfo(uint256 potId, address addr) external view returns (Payee memory) {
@@ -940,9 +1007,13 @@ contract Crumena {
         if (r.periodDays > MAX_PERIOD_DAYS || (r.periodLimit == 0) != (r.periodDays == 0)) revert BadRules();
     }
 
+    /// @dev Whole periods since the pot was created. periodDays is 1 to 366 (_checkRules),
+    ///      createdAt is in the past, and the result is checked to fit uint64.
     function _periodIndex(Pot storage pot_) internal view returns (uint64) {
-        // forge-lint: disable-next-line(unsafe-typecast) a day count over 64 bits is unreachable
-        return uint64((block.timestamp - pot_.createdAt) / (uint256(pot_.periodDays) * 1 days));
+        uint256 index = (block.timestamp - pot_.createdAt) / (uint256(pot_.periodDays) * 1 days);
+        if (index > type(uint64).max) revert BadRules();
+        // forge-lint: disable-next-line(unsafe-typecast) checked to fit above
+        return uint64(index);
     }
 
     /// @dev The current period and what has been paid in it (0 once a new period starts).

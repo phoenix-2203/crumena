@@ -133,6 +133,22 @@ contract RulesTest is Base {
         _expectPayRevert(potId, 41 * FUSD, abi.encodeWithSelector(Crumena.OverPeriodLimit.selector, 40 * FUSD));
     }
 
+    /// @notice QCAI (v3 audit, "overflow in period calculation"): a limit lowered below what
+    ///         was already spent this period refuses with OverPeriodLimit(0), not an
+    ///         arithmetic panic, and pays again once the next period starts.
+    function test_aPeriodLimitLoweredBelowWhatWasSpentRefusesCleanly() public {
+        uint256 potId = _potWith(_rules(0, 60 * FUSD, 7), 200 * FUSD);
+        _pay(potId, recipient, supplierA, 50 * FUSD, "");
+        _setRules(potId, _rules(0, 40 * FUSD, 7));
+        _expectPayRevert(potId, 1, abi.encodeWithSelector(Crumena.OverPeriodLimit.selector, 0));
+        (uint256 spent, uint256 limit,) = crumena.periodSpending(potId);
+        assertEq(spent, 50 * FUSD);
+        assertEq(limit, 40 * FUSD);
+        vm.warp(START + 7 days);
+        _pay(potId, recipient, supplierA, 40 * FUSD, "");
+        assertEq(token.balanceOf(supplierA), 90 * FUSD);
+    }
+
     function test_changingThePeriodLengthStartsCountingAfresh() public {
         uint256 potId = _potWith(_rules(0, 100 * FUSD, 7), 500 * FUSD);
         _pay(potId, recipient, supplierA, 100 * FUSD, "");

@@ -40,11 +40,12 @@ const GUIDE = [
 ] as const;
 
 const USES = [
-  ["Money sent home", "Pay the landlord, the school and the hospital. Nothing else, and what isn't spent comes back."],
-  ["Allowances", "The bookshop and the canteen, a weekly limit, and a freeze button if the phone goes missing."],
-  ["Group contributions", "Everyone pays into one pot; only the caterer and the venue get paid out, each up to the quote."],
-  ["Team budgets", "Approved suppliers, a cap per payment, and new ones only with the funder's yes."],
-  ["Grants", "Only the listed services, only until the end date. The rest goes back."],
+  ["Grants", "Only the listed contributors and services, only until the end date. The rest goes back."],
+  ["Team budgets", "A lead pays approved freelancers and suppliers on chain, within a cap per payment."],
+  ["Prize pools", "Many pay in; it pays out only to the approved winners, each up to an amount, with receipts."],
+  ["Allowances", "A weekly limit, spendable only with merchants you approve, and a freeze button."],
+  ["Gifts", "A gift for a course or a laptop, spendable only with the sellers you picked. Unused, it comes back."],
+  ["Savings goals", "Your own pot, payable only to the seller you're saving for, with a limit against impulse spending."],
 ] as const;
 
 const SECURITY = [

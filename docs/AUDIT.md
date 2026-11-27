@@ -7,6 +7,7 @@ The Post-Quantum dApp track asks for a two-stage audit with QoreChain's AI audit
 | Stage 1 | 2026-11-26 | [`audit/stage1-2026-11-26.pdf`](audit/stage1-2026-11-26.pdf) | 82/100 (risk: medium) | 1 high, 2 medium, 1 low, 1 info |
 | Stage 2 | 2026-11-26 | [`audit/stage2-2026-11-26.pdf`](audit/stage2-2026-11-26.pdf) | 82/100 (risk: medium) | 1 high, 2 medium, 1 low, 1 info |
 | v3, stage 1 | 2026-11-27 | [`audit/v3-stage1-2026-11-27.pdf`](audit/v3-stage1-2026-11-27.pdf) | 72/100 (risk: high) | 2 high, 2 medium, 1 low |
+| v4 | 2026-11-27 | [`audit/v4-2026-11-27.pdf`](audit/v4-2026-11-27.pdf) | **85/100** (risk: medium) | 1 high, 3 medium, 1 low |
 
 **Audited code.** One file, [`audit/Crumena-v2.audit.sol`](audit/Crumena-v2.audit.sol): the contract's four sources (`lib/Text.sol`, `lib/Pqc.sol`, `PotVault.sol`, `Crumena.sol`) joined without changes, only their import, pragma and licence lines dropped. It is an earlier build, deployed at `0xD98320A95030874498b92e9cf66f95F83dDe47af`. The current build (v4, `0xaF8Bed9f9e3C21F2E7a79c9968bFedA54d92E1F5`, [`TESTNET_RUN.md`](TESTNET_RUN.md)) adds per-payee amounts, short links and the fixes below; its joined file is [`audit/Crumena.audit.sol`](audit/Crumena.audit.sol), audited again below ([v3](#v3-the-current-build)). QCAI's line numbers don't point at the lines it describes in that file (line 658 is inside `addPayeeStatement`, for example), so findings are matched to the code by what they describe.
 
@@ -122,3 +123,15 @@ Checked and found sound, with the existing tests that cover each:
 Not addressed, by design: tokens that take a fee on transfer or change balances on their own aren't supported (pots are for stable tokens such as fUSD), and tokens sent to a vault other than its pot's token stay there.
 
 v4, with all of these fixes, is deployed at `0xaF8Bed9f9e3C21F2E7a79c9968bFedA54d92E1F5` from commit `84ca8f6`. Its runtime code matches this source byte for byte, and it passed the live run 23 of 23 ([`TESTNET_RUN.md`](TESTNET_RUN.md)).
+
+## v4
+
+Same setting, on the joined v4 file (the code deployed at `0xaF8Bed9f9e3C21F2E7a79c9968bFedA54d92E1F5`). **85/100**, up from 72. QCAI's summary now names the post-quantum access control, the reentrancy protection and the input validation as strengths. Its five findings, matched to the code by what they describe (its line numbers again point elsewhere: line 1020 is `_periodSpent`, line 700 is inside `createStatement`):
+
+| # | v4 finding | Severity | In the code | Tests |
+|---|---|---|---|---|
+| V4-1 | Potential overflow in period index calculation | HIGH | **Already done as recommended.** QCAI suggests checking that the period index fits `uint64` before narrowing it and reverting otherwise; `_periodIndex` does exactly that since v4 (`if (index > type(uint64).max) revert BadRules()`), and the period length is 1 to 366 days. | the three `qcai2` tests |
+| V4-2 | Privilege escalation via reentrancy guard misuse | MEDIUM | The guard is the standard pattern (a storage flag set before the body and cleared after, reverting with `Reentrant` if already set), on the three functions that move money, each of which also updates its state before the transfer. It grants nothing: every action still needs its signer's post-quantum signature. | `test_s2_3_*`, `test_v3_3_stateIsUpdatedBeforeTheTransfer` |
+| V4-3 | Unchecked return values from token transfers | MEDIUM | Checked, as in [QCAI-3](#qcai-3): `PotVault.send` reverts with `TransferFailed` unless the call succeeds and returns `true` or nothing. | the `qcai3` tests |
+| V4-4 | Unbounded loop in payee list management | MEDIUM | Every push to `_payeeList` goes through `_list`, which reverts with `TooManyPayees` at 50; requests stop at 40. | `test_qcai4_*`, `test_v3_4_*`, `test_review_requestsCantCrowdOutTheFunder` |
+| V4-5 | Front-running in payee approval | LOW | As in [QCAI-5](#qcai-5): an approval is the funder's signed statement naming the payee, its name and amount; whoever submits it first only carries out what the funder signed. | `test_qcai5_*` |

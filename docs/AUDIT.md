@@ -6,8 +6,9 @@ The Post-Quantum dApp track asks for a two-stage audit with QoreChain's AI audit
 |---|---|---|---|---|
 | Stage 1 | 2026-11-26 | [`audit/stage1-2026-11-26.pdf`](audit/stage1-2026-11-26.pdf) | 82/100 (risk: medium) | 1 high, 2 medium, 1 low, 1 info |
 | Stage 2 | 2026-11-26 | [`audit/stage2-2026-11-26.pdf`](audit/stage2-2026-11-26.pdf) | 82/100 (risk: medium) | 1 high, 2 medium, 1 low, 1 info |
+| v3, stage 1 | 2026-11-27 | [`audit/v3-stage1-2026-11-27.pdf`](audit/v3-stage1-2026-11-27.pdf) | 72/100 (risk: high) | 2 high, 2 medium, 1 low |
 
-**Audited code.** One file, [`audit/Crumena-v2.audit.sol`](audit/Crumena-v2.audit.sol): the contract's four sources (`lib/Text.sol`, `lib/Pqc.sol`, `PotVault.sol`, `Crumena.sol`) joined without changes, only their import, pragma and licence lines dropped. It is the previous build, deployed at `0xD98320A95030874498b92e9cf66f95F83dDe47af`. The current build (`0x08E9234d443CeF03ecf118dCa2D4f1002Abc9128`, [`TESTNET_RUN.md`](TESTNET_RUN.md)) adds per-payee amounts and short links; its joined file is [`audit/Crumena.audit.sol`](audit/Crumena.audit.sol), and the QCAI audit is to be run on it again. QCAI's line numbers don't point at the lines it describes in that file (line 658 is inside `addPayeeStatement`, for example), so findings are matched to the code by what they describe.
+**Audited code.** One file, [`audit/Crumena-v2.audit.sol`](audit/Crumena-v2.audit.sol): the contract's four sources (`lib/Text.sol`, `lib/Pqc.sol`, `PotVault.sol`, `Crumena.sol`) joined without changes, only their import, pragma and licence lines dropped. It is the previous build, deployed at `0xD98320A95030874498b92e9cf66f95F83dDe47af`. The current build (`0x08E9234d443CeF03ecf118dCa2D4f1002Abc9128`, [`TESTNET_RUN.md`](TESTNET_RUN.md)) adds per-payee amounts and short links; its joined file is [`audit/Crumena.audit.sol`](audit/Crumena.audit.sol), audited again below ([v3](#v3-the-current-build)). QCAI's line numbers don't point at the lines it describes in that file (line 658 is inside `addPayeeStatement`, for example), so findings are matched to the code by what they describe.
 
 ## Stage 1 findings and what we did
 
@@ -79,3 +80,25 @@ A pot's token is chosen by its funder; a token that misbehaves can only affect i
 ### S2-5
 
 Every token call is defensive. `decimals()` and `symbol()` are read once, by `staticcall`, with their answers' shapes checked (`BadToken` otherwise, and symbols must be short plain text so statements stay readable); `balanceOf` is a checked `staticcall`; `transfer` accepts the standard `true` and older tokens that return nothing, and reverts on anything else; an address without code can't be a pot's token.
+
+## v3: the current build
+
+Same setting, on [`audit/Crumena.audit.sol`](audit/Crumena.audit.sol) (v3: per-payee amounts, short links). **72/100**, five findings. Four are the earlier findings again, located elsewhere. One pointed at a real, small defect, now fixed.
+
+| # | v3 finding | Severity | Same as | Resolution | Regression tests |
+|---|---|---|---|---|---|
+| V3-1 | Missing access control on `PotVault.send()` | HIGH | S2-1 | **Already in place**, as in [S2-1](#s2-1): `NotCrumena` unless the caller is the vault's creator. | `test_s2_1_anotherCrumenaCantMoveThisCrumenasVault`, `test_qcai3_onlyCrumenaMovesAVaultsMoney` |
+| V3-2 | Potential overflow in period calculation | HIGH | QCAI-2, S2-2 | **Fixed: one subtraction could underflow, with no effect on money.** See [V3-2](#v3-2). | `test_aPeriodLimitLoweredBelowWhatWasSpentRefusesCleanly`, the three `qcai2` tests |
+| V3-3 | Reentrancy risk in `PotVault.send()` | MEDIUM | S2-3 | **Not exploitable**, as in [S2-3](#s2-3): every state change happens before the transfer. | the two `s2_3` tests |
+| V3-4 | Unbounded loop in `payeesOf()` | MEDIUM | QCAI-4 | **Bounded**, as in [QCAI-4](#qcai-4): at most 50 payees, and `payeesOf` is a view no transaction calls. | `test_qcai4_thePayeeListIsCappedAndNeverGrowsTwiceForOneAddress` |
+| V3-5 | Missing ERC-20 interface compliance | LOW | S2-5 | **Not applicable.** See [V3-5](#v3-5). | the `qcai3` tests, `test_rejectsATokenThatIsNotAContract` |
+
+### V3-2
+
+Line 420 of the joined file is the limit check in `pay`. Nothing there can wrap silently (Solidity 0.8 checks all arithmetic), but one case reverted with an arithmetic panic instead of the contract's own error: a funder keeps the period length and lowers the period limit below what was already spent this period (say 50 of 60 spent, limit lowered to 40). The next payment was refused, as it should be, but while building the "how much is left" number for `OverPeriodLimit`, `periodLimit - spent` underflowed, so the app could only say "the transaction was refused". No money could move. The fix gives `OverPeriodLimit(0)`, the same guard the per-payee check already had. The new test lowers the limit below what was spent, expects `OverPeriodLimit(0)`, then checks that payments work again from the next period.
+
+The fix is in the source (commit `66fbd37`). The contract deployed at `0x08E9234d443CeF03ecf118dCa2D4f1002Abc9128` was built before it and still has the old line until the next deploy.
+
+### V3-5
+
+Crumena isn't a token and doesn't claim to be one. Its `balanceOf(potId)` is the money in one pot, read from the pot's token with a checked `staticcall`; the name matches ERC-20 but it takes a pot number, not an address. Calls to the pot's token are as described in [S2-5](#s2-5).

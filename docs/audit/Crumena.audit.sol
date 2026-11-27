@@ -494,7 +494,7 @@ contract Crumena {
         if (pot.maxPerPayment != 0 && amount > pot.maxPerPayment) revert OverPaymentLimit(pot.maxPerPayment);
         if (p.limit != 0 && p.paid + amount > p.limit) revert OverPayeeLimit(p.limit > p.paid ? p.limit - p.paid : 0);
         (uint64 period, uint256 spent) = _periodSpent(pot);
-        if (pot.periodDays != 0 && spent + amount > pot.periodLimit) revert OverPeriodLimit(pot.periodLimit - spent);
+        if (pot.periodDays != 0 && spent + amount > pot.periodLimit) revert OverPeriodLimit(pot.periodLimit > spent ? pot.periodLimit - spent : 0);
         Text.requirePrintableOrEmpty(memo, MAX_MEMO);
         uint256 available = balanceOf(potId);
         if (amount > available) revert NotEnoughInPot(available, amount);

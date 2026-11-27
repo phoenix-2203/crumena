@@ -1,12 +1,12 @@
 # Crumena
 
-**Money for one purpose. Fill a pot for someone; they pay only the payees you approve, each up to the amount you set, within your caps; whatever is left comes back to you. Every step is a plain sentence signed with a post-quantum key and checked on chain.**
+**Give money for a purpose, not just to a person.** Someone else does the spending, but only to the payees you approved, only up to the amounts you set, only until the date you chose. Whatever is left comes back to you. Every step is a plain sentence signed with a post-quantum key (ML-DSA-87) and checked on QoreChain.
 
 A *crumena* was the Roman purse you carried for a purpose. Crumena makes that purse programmable on QoreChain: the funder, the spender and the payees each sign readable statements in QoreX with their **ML-DSA-87** key, and the contract checks every one with QoreChain's `pqcVerify` precompile against the key the chain has on record.
 
 Built for QoreChain's *Build Before Q-Day* fest, Post-Quantum dApp track.
 
-> **Live on QoreChain testnet** at `0xD98320A95030874498b92e9cf66f95F83dDe47af`. The live run passed **21 of 21** checks with real ML-DSA-87 signatures: the whole flow, the spending rules and freezing, an independent off-chain check of a payment's signature, and six attacks refused. Details and explorer links: [`docs/TESTNET_RUN.md`](docs/TESTNET_RUN.md). Tests: 137 contract, 12 server, 27 app. QCAI audit, both stages: 82/100, every finding answered in [`docs/AUDIT.md`](docs/AUDIT.md).
+> **Live on QoreChain testnet** at `0xaF8Bed9f9e3C21F2E7a79c9968bFedA54d92E1F5`. The live run passed **23 of 23** checks with real ML-DSA-87 signatures: the whole flow, payee amounts, short links, the spending rules and freezing, an independent off-chain check of a payment's signature, and six attacks refused. Details and explorer links: [`docs/TESTNET_RUN.md`](docs/TESTNET_RUN.md). Tests: 166 contract, 20 server, 28 app. QCAI audit: 85/100 on v4, every finding across four reports answered in [`docs/AUDIT.md`](docs/AUDIT.md).
 
 ## Try it in two minutes
 
@@ -23,7 +23,15 @@ Or go straight to **Make this pot misbehave** on the home page: a public pot on 
 
 ## Who it's for
 
-Money given for a purpose often isn't spent on it: a budget handed to someone else, a weekly allowance, a grant, a fund several people paid into. Today the funder either trusts the spender or pays every bill personally. Crumena sits in between.
+Money given for a purpose often isn't spent on it. Today the person giving it either trusts the spender completely or pays every bill themselves. Crumena sits in between.
+
+- **Money sent home.** You send money home for rent, school fees and a hospital bill. The person at home pays the landlord, the school and the hospital, and nothing else. What isn't spent comes back.
+- **Allowances.** A parent funds a student's term: the bookshop, the hostel, the canteen, with a weekly limit. If the phone is lost, one tap freezes the pot.
+- **Group contributions.** Friends, family or colleagues pay into one pot's address for a wedding, a burial, a trip or a shared bill (anyone can pay in, from the bank lane or an EVM wallet). The organiser can pay only the caterer, the venue and the transport, each up to the amount quoted, and every payment shows on the pot's page with a receipt anyone can check.
+- **Project and team budgets.** A company funds a site manager or an event lead, who pays approved suppliers within a cap per payment. A new supplier needs the funder's approval, for an amount the funder decides.
+- **Grants and bounties.** A foundation or DAO gives a grantee a pot that can pay only the listed services (hosting, an audit, a contractor) until the grant ends. After the end date, what's left goes back.
+
+What it isn't: a shared wallet. One person funds the pot and gets the rest back (for a group collection, that's the organiser, who settles up with the group), one person spends, and the contract decides what's allowed.
 
 | Role | Can | Can't |
 |---|---|---|

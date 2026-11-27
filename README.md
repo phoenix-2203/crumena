@@ -23,13 +23,17 @@ Or go straight to **Make this pot misbehave** on the home page: a public pot on 
 
 ## Who it's for
 
-Money given for a purpose often isn't spent on it. Today the person giving it either trusts the spender completely or pays every bill themselves. Crumena sits in between.
+Money given for a purpose often isn't spent on it. Today the person giving it either trusts the spender completely or pays every bill themselves. Crumena sits in between. Pots hold stablecoins (fUSD on testnet), so the amounts mean the same tomorrow as today.
 
-- **Money sent home.** You send money home for rent, school fees and a hospital bill. The person at home pays the landlord, the school and the hospital, and nothing else. What isn't spent comes back.
-- **Allowances.** A parent funds a student's term: the bookshop, the hostel, the canteen, with a weekly limit. If the phone is lost, one tap freezes the pot.
-- **Group contributions.** Friends, family or colleagues pay into one pot's address for a wedding, a burial, a trip or a shared bill (anyone can pay in, from the bank lane or an EVM wallet). The organiser can pay only the caterer, the venue and the transport, each up to the amount quoted, and every payment shows on the pot's page with a receipt anyone can check.
-- **Project and team budgets.** A company funds a site manager or an event lead, who pays approved suppliers within a cap per payment. A new supplier needs the funder's approval, for an amount the funder decides.
-- **Grants and bounties.** A foundation or DAO gives a grantee a pot that can pay only the listed services (hosting, an audit, a contractor) until the grant ends. After the end date, what's left goes back.
+- **Grants and DAO budgets.** A foundation or DAO gives a grantee a pot that pays only the listed contributors and services until the grant ends. What's left goes back.
+- **Team and project budgets.** A company funds a project lead, who pays approved freelancers and suppliers (paid in stablecoins) within a cap per payment. A new supplier needs the funder's approval, for an amount the funder decides.
+- **Bounties, prize pools and group collections.** Anyone can pay into a pot's address. It pays out only to the addresses the organiser approved, each up to an amount, with a public receipt for every payment.
+- **Allowances.** A parent or employer funds someone's spending with approved merchants that accept stablecoins, with a weekly limit and a freeze button.
+- **Gifts with a purpose.** Give someone a pot for a course, a laptop or a trip, spendable only with the sellers you picked. What they don't use comes back to you, or you release the rest to them as a free gift.
+- **Savings goals.** Be your own funder and spender: put stablecoins aside in a pot that pays only the seller you're saving for, with a weekly limit so it can't be drained on impulse. You can still unlock it yourself, so it's a guard against impulse spending rather than a vault.
+- **Agent budgets.** The spender is just a key, so it can be a bot or an AI agent with its own post-quantum key. It can pay only the services you approved, up to your limits, and you can freeze it at once.
+
+Today payees are QoreChain addresses paid in fUSD. As local stablecoins and payment providers arrive on QoreChain, the same pots can pay landlords, schools and clinics directly.
 
 What it isn't: a shared wallet. One person funds the pot and gets the rest back (for a group collection, that's the organiser, who settles up with the group), one person spends, and the contract decides what's allowed.
 

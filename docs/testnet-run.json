@@ -1,41 +1,41 @@
 {
-  "at": "2026-11-27T04:53:20.879Z",
+  "at": "2026-11-27T10:34:36.831Z",
   "chainId": "qorechain-diana",
-  "crumena": "0x08E9234d443CeF03ecf118dCa2D4f1002Abc9128",
-  "potId": "1",
+  "crumena": "0xaF8Bed9f9e3C21F2E7a79c9968bFedA54d92E1F5",
+  "potId": "2",
   "accounts": {
-    "funder": "qor1fw6npkakwmh249gw4ly0esjmj636yh6wqnlyfk",
-    "spender": "qor1n87xp8zflgrhq80uy8af9dzjchretk6mzm4z6w",
-    "shopA": "qor1qvnnznahhcue5k64h3k533j8msuzuqxhzahqtc",
-    "shopB": "qor1tktctly7gqvhgzv787rnn97h9pm0fx0twdg8gm",
-    "attacker": "qor1wftuugxct49z2g75ay3uv7ah5dnr8hussmu76m",
+    "funder": "qor1fjvghvanvsg3r95kc5vyzu9gvat6970fv30w26",
+    "spender": "qor1gfpt5tj69ec92e0jfrmjq0tn8afcgas9upxnla",
+    "shopA": "qor17nqj3z88h2uwhatpufd7apvj9e2xak9wmkp860",
+    "shopB": "qor18mh8ms6s6mc405tyzu2an7krzqe04pfdpm2hr7",
+    "attacker": "qor146psv64vfxc78hpdk5c993jtw2fmdn5zfyests",
     "relayer": "qor1ey4prsgv94zc4gdf8dzdupagwj2mstz5tlh9xh"
   },
   "steps": [
     {
       "step": "Funder creates a pot, signed with ML-DSA-87 and checked by pqcVerify",
       "ok": true,
-      "detail": "pot #1, vault 0x40ac36BfD23Bf031EdC30F7560DB38b144baeF83, one approved payee (up to 60 fUSD)",
-      "tx": "0x1f2c2889d13fd29e3282b59d830bf02e77663415e07c4ae2e84b9e6f849ed412",
-      "qorechainTx": "FC2C1E225253478439B9192F46BE29A9A913F0EB38177D23CB6FBE551E8D4702"
+      "detail": "pot #2, vault 0xccF2aeb474fbc953Df1509664d94Ec562d600CA7, one approved payee (up to 60 fUSD)",
+      "tx": "0x9d7d7b809fefc3f49678ff7204fa3ba1ceadba6a5804db837ce31d3b159a39ec",
+      "qorechainTx": "B9BBF0E3B72D34A71F19CC0BD6656335E0361F97A9E4B0AE626E545DA7779843"
     },
     {
       "step": "The pot's short link code (the first 8 bytes of its vault) finds it",
       "ok": true,
-      "detail": "potOfCode(0x40ac36BfD23Bf031) = 1"
+      "detail": "potOfCode(0xccF2aeb474fbc953) = 2"
     },
     {
       "step": "Funder pays 100 fUSD into the pot's address from the bank lane (MsgConvertCoin, hybrid-signed)",
       "ok": true,
       "detail": "pot balance 100 fUSD",
-      "tx": "AB26474F76C50863CC6A326078D415A8FC09437842EE581E89F25E1D374B1432"
+      "tx": "7C7473CBDCFD62E811CFA6A52C096D46F88AD88105565B673AB8726F748226C0"
     },
     {
       "step": "The person spending the pot pays the approved shop 25 fUSD, post-quantum signed",
       "ok": true,
       "detail": "shop received 25 fUSD; the spender sent no transaction and paid no gas",
-      "tx": "0xa80aeb288e3deefc80902f7b1a60da0091cfe3da496c57be6adad2c20307b2a3",
-      "qorechainTx": "3F72B7870F6325C5EE72B13DE9FBAA279A1A47AD828813524433363813B748B1"
+      "tx": "0x8e567f34378141c27f9e5904b29a6093535d62323500c201b4a6a90a9847fb10",
+      "qorechainTx": "87187494ABBECBD676C90CC4DBD13F3ACB199DD872C06DC5E4DD9E4406773FCA"
     },
     {
       "step": "Independent check of that payment: statement and key read from the chain at the block before, ML-DSA-87 verified off chain",
@@ -46,29 +46,29 @@
       "step": "The shop confirms the address is its own, with its own ML-DSA-87 key",
       "ok": true,
       "detail": "payee marked confirmed on chain",
-      "tx": "0x250722f18c735bdd3797ce8fe6771a7f85f1cdd59c626a5f16d7f561f5ba6a88",
-      "qorechainTx": "1144E465C47FCEB4048D72756FA8041F1E9F5D9CC6C6C8352528B7285EA80A95"
+      "tx": "0x5bd1c6482002a8fc90ed2d7be0209553eb3352bd4e5db699e1ab04ce5cca65fc",
+      "qorechainTx": "9DD54E3773D04BBAB36C3C55CA86D4C179E4FBDEE4EF7A8D4D99FFBAFED2BCA6"
     },
     {
       "step": "The spender asks the funder to approve a new shop, for 15 fUSD",
       "ok": true,
       "detail": "request recorded with its amount; the pot still can't pay it",
-      "tx": "0xe31b7ddaa5385a18531d9ca9f8d0f09c650580619bea3a292fd88834f455cde1",
-      "qorechainTx": "2ED71735F5825AEA4629F417D8B2E1055F48A3339CEE4C9752ABB2F9D0DB879A"
+      "tx": "0xd3e53de225c91874edd58e2b29a8ed5c9748c186953b2103c3f86945ef621bbf",
+      "qorechainTx": "D4306AE66E32463799F057549A5BF20E07640C4DF9ABB0685F8CFFB1B8319A2D"
     },
     {
       "step": "The funder approves it up to 12 fUSD, an amount of its own choice, post-quantum signed",
       "ok": true,
       "detail": "Brightline Electrical approved, up to 12 fUSD in total",
-      "tx": "0x9d64f2e2b01389e8e9271599c7ae1f2126865b60b3b5bcd430645e87287eff52",
-      "qorechainTx": "0637AC0729E0DD23D961BE35E0471BF2A4C92AE234CD6FBB17E63984080D05DA"
+      "tx": "0xe5397019cc8654290dd76bfaffa229044a2dad54d0972ac7bd2b25550633abec",
+      "qorechainTx": "448BA1968BF97976D14E5EF925D143FF0A23EE52867AD66B2E0DC659C1F73D6B"
     },
     {
       "step": "The spender pays the new shop 10 fUSD",
       "ok": true,
       "detail": "a shop with no post-quantum key of its own can still be paid",
-      "tx": "0x3e2e18333744a68bac09ec3aa66899c76cf8c3ea9f77d0854ed9316acf4b4dcd",
-      "qorechainTx": "A49A3B31CB3F6AC80A86DBA647656E2B3C5B842E70D946F54F864CBEB57BEE8A"
+      "tx": "0xa45a4a02da39f80b877839b8aa00fec48a30707c73f28ec6f234afc014245e7b",
+      "qorechainTx": "F39293A3D000AB1E3A6FFD014718126BE307A4B6E70F38884D1DE8D5279E1861"
     },
     {
       "step": "Rule: a payment past what the funder approved for that shop is refused, even properly signed",
@@ -78,14 +78,14 @@
     {
       "step": "Attack: open an EVM window with the funder's stolen classical key only",
       "ok": true,
-      "detail": "refused by the chain: account qor1fw6npkakwmh249gw4ly0esjmj636yh6wqnlyfk has a registered PQC key and must include the hybrid signature extension (hybrid mode: required): hybrid PQC signature required"
+      "detail": "refused by the chain: account qor1fjvghvanvsg3r95kc5vyzu9gvat6970fv30w26 has a registered PQC key and must include the hybrid signature extension (hybrid mode: required): hybrid PQC signature required"
     },
     {
       "step": "Attack: inside an open window, send addPayee from the funder's own address without its post-quantum signature",
       "ok": true,
       "detail": "reverted on chain (BadPqcSignature): the attacker was not added",
-      "tx": "0x2d5f960c87b36858c60d4de16fcea07a79c8fd25e3050ac2dedcd7ce1747db14",
-      "qorechainTx": "7D1635AD0CE5FBC8DD80A7B1405767A33773BFA51EDC37548DA3FA2DF27FF63E"
+      "tx": "0xb7cb7ff4fc778902d89c1d76cad883503acfdf56ccd5040fcb41c60585204bec",
+      "qorechainTx": "B3BE783CCC4F48216B0B3A834E64F0082340707DAD5D022841CAB1B44C1D6AF2"
     },
     {
       "step": "Attack: the funder's statement signed with the attacker's own registered ML-DSA-87 key",
@@ -95,7 +95,7 @@
     {
       "step": "Replay to the relayer: it returns the first payment and sends nothing new",
       "ok": true,
-      "detail": "answered with 0xa80aeb288e3deefc80902f7b1a60da0091cfe3da496c57be6adad2c20307b2a3"
+      "detail": "answered with 0x8e567f34378141c27f9e5904b29a6093535d62323500c201b4a6a90a9847fb10"
     },
     {
       "step": "Attack: replay the spender's signed payment straight to the chain",
@@ -121,8 +121,8 @@
       "step": "Rule: payments count towards the 60 fUSD weekly limit",
       "ok": true,
       "detail": "55 of 60 fUSD spent this week",
-      "tx": "0x0da971a315d577ecc3850d9dfb6041ca6f79a458b14bd454985424100791918a",
-      "qorechainTx": "0A8B9A452F34AB989E7847B9BE6D99530FE5CE68FE0BEA59B916981E67C200A4"
+      "tx": "0x00ef2347859b9a6e736c40319d0ac1c60210c704b1617408483bad6807895734",
+      "qorechainTx": "6E11D01931E9FBDC56945D0AF0A94F515695182D4DE1F9DC99E6320AA39B66AE"
     },
     {
       "step": "Rule: a payment past the weekly limit is refused",
@@ -133,8 +133,8 @@
       "step": "The funder freezes the pot (the lost-phone button), post-quantum signed",
       "ok": true,
       "detail": "frozen",
-      "tx": "0x14ea0ffe7750eca064f3e0b3c097aaaebd426e9f8de898576530bccb9c1ca35d",
-      "qorechainTx": "5B8E3D8BCACC8468D045CF81A1CB7D6C712B038180B2C52AE001E6AC76C75044"
+      "tx": "0x5505c7bc1e824bc58cf458d8c7e42529ca81617f135dc73c82cf6f7ca3397485",
+      "qorechainTx": "46FF9D0F84ED08A7B65B3A80150C2C24C61913B1D7BB4F4BC49ACA0D87E5F2D3"
     },
     {
       "step": "A properly signed payment from a frozen pot is refused",
@@ -145,8 +145,8 @@
       "step": "After the end date, the rest goes back to the funder (anyone may trigger it)",
       "ok": true,
       "detail": "5 fUSD back with the funder",
-      "tx": "0x2a0b3d01f17f153cc9428669f8f69af1238f4dc8ad06719561fd1b44084c877c",
-      "qorechainTx": "83B70D7DDE67BA68287C83250B71293AE81EC3B3CF584FAF0ABE59DB4AEE1D7E"
+      "tx": "0x560c76ff13bc63d22c45668b3c8ad67a1b9d6a6fabf9f9e4856fbf5bc0a2b595",
+      "qorechainTx": "11DA653DD5ECB1C75F7070EE666E4BF38EE731302CDAACF89F09AA8FFC477901"
     }
   ],
   "passed": 23,

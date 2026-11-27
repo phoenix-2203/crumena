@@ -8,7 +8,7 @@ The Post-Quantum dApp track asks for a two-stage audit with QoreChain's AI audit
 | Stage 2 | 2026-11-26 | [`audit/stage2-2026-11-26.pdf`](audit/stage2-2026-11-26.pdf) | 82/100 (risk: medium) | 1 high, 2 medium, 1 low, 1 info |
 | v3, stage 1 | 2026-11-27 | [`audit/v3-stage1-2026-11-27.pdf`](audit/v3-stage1-2026-11-27.pdf) | 72/100 (risk: high) | 2 high, 2 medium, 1 low |
 
-**Audited code.** One file, [`audit/Crumena-v2.audit.sol`](audit/Crumena-v2.audit.sol): the contract's four sources (`lib/Text.sol`, `lib/Pqc.sol`, `PotVault.sol`, `Crumena.sol`) joined without changes, only their import, pragma and licence lines dropped. It is the previous build, deployed at `0xD98320A95030874498b92e9cf66f95F83dDe47af`. The current build (`0x08E9234d443CeF03ecf118dCa2D4f1002Abc9128`, [`TESTNET_RUN.md`](TESTNET_RUN.md)) adds per-payee amounts and short links; its joined file is [`audit/Crumena.audit.sol`](audit/Crumena.audit.sol), audited again below ([v3](#v3-the-current-build)). QCAI's line numbers don't point at the lines it describes in that file (line 658 is inside `addPayeeStatement`, for example), so findings are matched to the code by what they describe.
+**Audited code.** One file, [`audit/Crumena-v2.audit.sol`](audit/Crumena-v2.audit.sol): the contract's four sources (`lib/Text.sol`, `lib/Pqc.sol`, `PotVault.sol`, `Crumena.sol`) joined without changes, only their import, pragma and licence lines dropped. It is an earlier build, deployed at `0xD98320A95030874498b92e9cf66f95F83dDe47af`. The current build (v4, `0xaF8Bed9f9e3C21F2E7a79c9968bFedA54d92E1F5`, [`TESTNET_RUN.md`](TESTNET_RUN.md)) adds per-payee amounts, short links and the fixes below; its joined file is [`audit/Crumena.audit.sol`](audit/Crumena.audit.sol), audited again below ([v3](#v3-the-current-build)). QCAI's line numbers don't point at the lines it describes in that file (line 658 is inside `addPayeeStatement`, for example), so findings are matched to the code by what they describe.
 
 ## Stage 1 findings and what we did
 
@@ -121,4 +121,4 @@ Checked and found sound, with the existing tests that cover each:
 
 Not addressed, by design: tokens that take a fee on transfer or change balances on their own aren't supported (pots are for stable tokens such as fUSD), and tokens sent to a vault other than its pot's token stay there.
 
-The fixes are in the source and not deployed yet. The contract live at `0x08E9234d443CeF03ecf118dCa2D4f1002Abc9128` is v3, built before them; v4 is deployed next, and [`TESTNET_RUN.md`](TESTNET_RUN.md) is updated with it.
+v4, with all of these fixes, is deployed at `0xaF8Bed9f9e3C21F2E7a79c9968bFedA54d92E1F5` from commit `84ca8f6`. Its runtime code matches this source byte for byte, and it passed the live run 23 of 23 ([`TESTNET_RUN.md`](TESTNET_RUN.md)).

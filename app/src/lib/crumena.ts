@@ -125,12 +125,12 @@ export function createCrumena(config: Config, opts: Options = {}) {
   // ------------------------------------------------------------------ reads
 
   async function pot(id: bigint): Promise<Pot> {
-    const [p, balance] = await Promise.all([read<Omit<Pot, "id" | "balance">>("potInfo", [id]), read<bigint>("balanceOf", [id])]);
+    const [p, balance] = await Promise.all([read<Omit<Pot, "id" | "balance">>("potInfo", [id]), read<bigint>("potBalance", [id])]);
     return { ...p, id, balance };
   }
 
   async function payees(id: bigint): Promise<Payee[]> {
-    const [addrs, info] = await read<[Address[], Omit<Payee, "address">[]]>("payeesOf", [id]);
+    const [addrs, info] = await read<[Address[], Omit<Payee, "address">[]]>("payeesOf", [id, 0n, 50n]);
     return addrs.map((a, i) => ({ address: a, ...info[i]! }));
   }
 

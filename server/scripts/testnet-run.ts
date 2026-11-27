@@ -125,7 +125,7 @@ record("The pot's short link code (the first 8 bytes of its vault) finds it", by
 await main.native("fUSD to the funder", [{ typeUrl: "/cosmos.bank.v1beta1.MsgSend", value: { fromAddress: main.qor, toAddress: funder.qor, amount: [{ denom: FUSD_DENOM, amount: (100n * FUSD_UNIT).toString() }] } }]);
 const paidIn = await funder.native("pay into the pot", [convertFusdMsg(funder.qor, pot.vault, 100n * FUSD_UNIT)]);
 await sleep(2000);
-const bal = await read<bigint>("balanceOf", [potId]);
+const bal = await read<bigint>("potBalance", [potId]);
 record("Funder pays 100 fUSD into the pot's address from the bank lane (MsgConvertCoin, hybrid-signed)", bal === 100n * FUSD_UNIT, `pot balance ${bal / FUSD_UNIT} fUSD`, paidIn.transactionHash);
 
 // --------------------------------------------------------------------- 3. pay

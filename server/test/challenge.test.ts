@@ -19,7 +19,7 @@ vi.mock("../src/chain", () => ({
     getBlockNumber: vi.fn(async () => 1234n),
     readContract: vi.fn(async ({ functionName }: { functionName: string }) => {
       if (functionName === "nonceOf") return 7n;
-      if (functionName === "balanceOf") return 24_990_000n;
+      if (functionName === "potBalance") return 24_990_000n;
       if (functionName === "potInfo") return { paidOut: 10_000n, vault: addr(9) };
       return `statement from ${functionName}`;
     }),

@@ -228,7 +228,7 @@ export function createChallenge(opts: {
   async function state() {
     if (!saved) return { ready: false as const };
     const potId = BigInt(saved.potId);
-    const [balance, paidOut] = await Promise.all([read<bigint>("balanceOf", [potId]), read<{ paidOut: bigint }>("potInfo", [potId]).then((p) => p.paidOut)]);
+    const [balance, paidOut] = await Promise.all([read<bigint>("potBalance", [potId]), read<{ paidOut: bigint }>("potInfo", [potId]).then((p) => p.paidOut)]);
     const refused = Object.values(saved.stats.refused).reduce((a, b) => a + b, 0);
     return {
       ready: true as const,

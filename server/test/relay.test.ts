@@ -27,8 +27,8 @@ describe("what the relayer sends", () => {
   });
 
   it("refuses Crumena functions nobody signs", () => {
-    const view = encodeFunctionData({ abi: CRUMENA_ABI, functionName: "balanceOf", args: [1n] });
-    expect(() => relayer.parse(view)).toThrow(/doesn't send balanceOf/);
+    const view = encodeFunctionData({ abi: CRUMENA_ABI, functionName: "potBalance", args: [1n] });
+    expect(() => relayer.parse(view)).toThrow(/doesn't send potBalance/);
   });
 
   it("covers every state-changing function of the contract", () => {
